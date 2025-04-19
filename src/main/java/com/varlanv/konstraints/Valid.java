@@ -1,7 +1,9 @@
 package com.varlanv.konstraints;
 
-import org.intellij.lang.annotations.PrintFormat;
-import org.jetbrains.annotations.*;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.NotNullByDefault;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -131,25 +133,8 @@ public interface Valid<T> {
         return new Invalid<>(List.copyOf(violations));
     }
 
-    /**
-     * Creates a {@link ValidationSpec} from the given specification action.
-     * The specification action defines rules for validation by applying a series of assertions
-     * through an {@link AssertionsChain}.
-     *
-     * @param <T>        the type of the value to be validated
-     * @param specAction a function that takes an {@link AssertionsChain} and defines the validation rules
-     *                   to be applied, returning the updated {@link AssertionsChain}
-     * @return a {@link ValidationSpec} instance configured with the specified validation rules
-     */
-    static <T> ValidationSpec<T> validationSpec(Function<AssertionsChain<T, T>, AssertionsChain<T, ?>> specAction) {
-        return ValidationSpec.fromRules(
-                specAction.apply(
-                        new AssertionsChain<>(
-                                Rules.create(),
-                                Function.identity()
-                        )
-                ).rules()
-        );
+    static <T> ValidationSpec<T> validationSpecV2(BiFunction<T, AssertionsChain<T, T>, AssertionsChain<T, ?>> specAction) {
+        return ValidationSpec.fromFn(specAction);
     }
 
     interface Rules<T> {
@@ -218,37 +203,47 @@ public interface Valid<T> {
          */
         UnaryOperator<T> toValidationFunction(Function<List<Violation>, ? extends Throwable> onException);
 
-        /**
-         * Converts the validation specification into a reusable unary operator
-         * that validates objects of type T, applying the specified exception supplier
-         * for any validation errors encountered.
-         *
-         * @param onException a supplier that provides an exception of a specified type
-         *                    to be thrown in case validation errors occur
-         * @return a unary operator that validates an object of type T and throws the exception
-         * provided by the {@code onException} supplier if validation errors occur
-         */
         UnaryOperator<T> toValidationFunction(Supplier<? extends Throwable> onException);
 
-        /**
-         * Validates the given object of type T based on the rules defined in the validation specification.
-         *
-         * @param t the object of type T to be validated
-         * @return a {@link Valid} instance that encapsulates the result of the validation
-         */
         Valid<T> validate(T t);
 
-        /**
-         * Creates a ValidationSpec instance from the provided validation rules.
-         * This method wraps the given rules in a validation specification that can validate
-         * objects of type T and produce validation results.
-         *
-         * @param <T>   the type of objects to be validated
-         * @param rules the set of validation rules to be encapsulated in the validation specification,
-         *              must not be null
-         * @return a ValidationSpec instance that encapsulates the provided validation rules
-         * and provides functionality for validating objects of type T
-         */
+        static <T> ValidationSpec<T> fromFn(BiFunction<T, AssertionsChain<T, T>, AssertionsChain<T, ?>> specAction) {
+            Objects.requireNonNull(specAction);
+            return new ValidationSpec<>() {
+                @Override
+                public Function<T, Valid<T>> toValidationFunction() {
+                    return this::validate;
+                }
+
+                @Override
+                public UnaryOperator<T> toValidationFunction(Function<List<Violation>, ? extends Throwable> onException) {
+                    Objects.requireNonNull(onException);
+                    return t -> validate(t).orElseThrow(onException);
+                }
+
+                @Override
+                public UnaryOperator<T> toValidationFunction(Supplier<? extends Throwable> onException) {
+                    Objects.requireNonNull(onException);
+                    return t -> validate(t).orElseThrow(onException);
+                }
+
+                @Override
+                public Valid<T> validate(T t) {
+                    Objects.requireNonNull(t);
+                    var rules = Rules.<T>create();
+                    var chain = new AssertionsChain<>(t, rules);
+                    specAction.apply(t, chain);
+
+                    var violations = rules.apply(t);
+                    if (violations.isEmpty()) {
+                        return Valid.ofValid(t);
+                    } else {
+                        return new Invalid<>(violations);
+                    }
+                }
+            };
+        }
+
         static <T> ValidationSpec<T> fromRules(Rules<T> rules) {
             Objects.requireNonNull(rules);
             return new ValidationSpec<>() {
@@ -287,34 +282,79 @@ public interface Valid<T> {
     interface Rule<T> extends Function<@NotNull T, @NotNull Optional<Violation>> {
     }
 
-    /**
-     * The AssertionsChain class represents a chainable utility for defining validation rules
-     * on fields or properties of a generic object. It provides APIs to specify constraints
-     * such as null checks, numeric comparisons, and string validations by adding rules to
-     * a rule container. This enables fluent and extensible object validation.
-     *
-     * @param <T> the type of the object being validated
-     * @param <N> current nest level
-     */
     final class AssertionsChain<T, N> {
 
+        private final String currentFieldName;
+        private final N currentValue;
         private final Rules<T> rules;
-        private final Function<T, N> currentNestFn;
 
-        @Contract(mutates = "param1")
-        public AssertionsChain(Rules<T> rules, Function<T, N> currentNestFn) {
+        public AssertionsChain(N currentValue, Rules<T> rules) {
+            this.currentFieldName = "";
+            this.currentValue = currentValue;
             this.rules = rules;
-            this.currentNestFn = currentNestFn;
         }
 
-        public <R> AssertionsChain<T, R> extracting(Function<@NotNull N, @Nullable R> valueFn, String fieldName) {
-            return new AssertionsChain<>(rules, t -> valueFn.apply(currentNestFn.apply(t)));
+        public AssertionsChain(String currentFieldName, N currentValue, Rules<T> rules) {
+            if (currentFieldName.isBlank()) {
+                throw new IllegalArgumentException("Field name must not be blank");
+            }
+            this.currentFieldName = currentFieldName;
+            this.currentValue = currentValue;
+            this.rules = rules;
         }
 
-        public AssertionsChain<T, N> customValidation(Function<N, Boolean> valueFn, @PrintFormat String messageFormat, Object... args) {
+        public <R> AssertionsChain<T, N> extractingNonNull(Function<@NotNull N, @Nullable R> valueFn,
+                                                           String fieldName,
+                                                           BiFunction<R, AssertionsChain<T, R>, AssertionsChain<T, R>> specAction) {
+            var newValue = valueFn.apply(currentValue);
+            if (newValue == null) {
+                rules.add(t -> Optional.of(Violation.of(currentFieldName, "Field [%s] is expected to be non-null".formatted(currentFieldName))));
+                return this;
+            }
+            var newFieldName = currentFieldName.isEmpty() ? fieldName : currentFieldName + "." + fieldName;
+            var apply = specAction.apply(newValue, new AssertionsChain<>(newFieldName, newValue, rules));
+            return this;
+        }
+
+        public <R> AssertionsChain<T, N> extractingNullable(Function<@NotNull N, @Nullable R> valueFn,
+                                                            String fieldName,
+                                                            BiFunction<R, AssertionsChain<T, R>, AssertionsChain<T, R>> specAction) {
+            var newValue = valueFn.apply(currentValue);
+            if (newValue == null) {
+                return this;
+            }
+            var newFieldName = currentFieldName.isEmpty() ? fieldName : currentFieldName + "." + fieldName;
+            specAction.apply(newValue, new AssertionsChain<>(newFieldName, newValue, rules));
+            return this;
+        }
+//
+//        public <R> AssertionsChain<T, ?> extractingIterableNonNull(Function<@NotNull N, @Nullable Iterable<R>> valueFn,
+//                                                                   String fieldName,
+//                                                                   BiFunction<Iterable<R>, AssertionsChain<T, Iterable<R>>, AssertionsChain<T, ?>> specAction) {
+//            var newValue = valueFn.apply(currentValue);
+//            if (newValue == null) {
+//                rules.add(t -> Optional.of(Violation.of(currentFieldName, "Field [%s] is expected to be non-null".formatted(currentFieldName))));
+//                return this;
+//            }
+//            var newFieldName = currentFieldName.isEmpty() ? fieldName : currentFieldName + "." + fieldName;
+//            return specAction.apply(newValue, new AssertionsChain<>(newFieldName, newValue, rules));
+//        }
+//
+//        public <R> AssertionsChain<T, ?> extractingIterableNullable(Function<@NotNull N, @Nullable Iterable<R>> valueFn,
+//                                                                    String fieldName,
+//                                                                    BiFunction<R, AssertionsChain<T, R>, AssertionsChain<T, ?>> specAction) {
+//            var newValue = valueFn.apply(currentValue);
+//            if (newValue == null) {
+//                return this;
+//            }
+//            var newFieldName = currentFieldName.isEmpty() ? fieldName : currentFieldName + "." + fieldName;
+//            return specAction.apply(newValue, new AssertionsChain<>(newFieldName, newValue, rules));
+//        }
+
+        public AssertionsChain<T, N> isNull(Function<@NotNull N, @Nullable Object> valueFn, String fieldName) {
             rules.add(t -> {
-                if (!valueFn.apply(currentNestFn.apply(t))) {
-                    return Optional.of(Violation.of(messageFormat.formatted(args)));
+                if (valueFn.apply(currentValue) != null) {
+                    return Optional.of(Violation.of(fieldName, "Field [%s] is expected to be null".formatted(fieldNameFormat(currentFieldName, fieldName))));
                 } else {
                     return Optional.empty();
                 }
@@ -322,11 +362,10 @@ public interface Valid<T> {
             return this;
         }
 
-        public AssertionsChain<T, N> isNull(Function<@NotNull N, @Nullable Object> valueFn, @PrintFormat String fieldNameFormat, Object... args) {
+        public AssertionsChain<T, N> isNotNull(Function<@NotNull N, @Nullable Object> valueFn, String fieldName) {
             rules.add(t -> {
-                if (valueFn.apply(currentNestFn.apply(t)) != null) {
-                    var fieldName = fieldNameFormat.formatted(args);
-                    return Optional.of(Violation.of(fieldName, "Field [%s] is expected to be null".formatted(fieldName)));
+                if (valueFn.apply(currentValue) == null) {
+                    return Optional.of(Violation.of(fieldName, "Field [%s] is expected to be non-null".formatted(fieldNameFormat(currentFieldName, fieldName))));
                 } else {
                     return Optional.empty();
                 }
@@ -334,41 +373,31 @@ public interface Valid<T> {
             return this;
         }
 
-        public AssertionsChain<T, N> isNotNull(Function<@NotNull N, @Nullable Object> valueFn, @PrintFormat String fieldNameFormat, Object... args) {
-            rules.add(t -> {
-                if (valueFn.apply(currentNestFn.apply(t)) == null) {
-                    var fieldName = fieldNameFormat.formatted(args);
-                    return Optional.of(Violation.of(fieldName, "Field [%s] is expected to be non-null".formatted(fieldName)));
-                } else {
-                    return Optional.empty();
-                }
-            });
-            return this;
-        }
-
-        public StringAssertions<T, N> stringField(Function<@NotNull N, @Nullable String> stringValueFn, @PrintFormat String fieldNameFormat, Object... args) {
+        public StringAssertions<T, N> stringField(Function<@NotNull N, @Nullable String> stringValueFn,
+                                                  String fieldName) {
             Function<N, Optional<String>> fn = wrapOptional(stringValueFn);
-            return new StringAssertions<>(currentNestFn, fn, fieldNameFormat(fieldNameFormat, args), this);
+            return new StringAssertions<>(currentValue, fn, () -> fieldNameFormat(currentFieldName, fieldName), this);
         }
 
-        public NumberAssertions<Integer, T, N> integerField(Function<@NotNull N, @Nullable Integer> integerValueFn, @PrintFormat String fieldNameFormat, Object... args) {
+        public NumberAssertions<Integer, T, N> integerField(Function<@NotNull N, @Nullable Integer> integerValueFn,
+                                                            String fieldName) {
             Function<N, Optional<Integer>> fn = wrapOptional(integerValueFn);
-            return new NumberAssertions<>(currentNestFn, fn, Integer::compareTo, fieldNameFormat(fieldNameFormat, args), this);
+            return new NumberAssertions<>(currentValue, fn, Integer::compareTo, () -> fieldNameFormat(currentFieldName, fieldName), this);
         }
 
-        public NumberAssertions<Long, T, N> longField(Function<@NotNull N, @Nullable Long> longValueFn, @PrintFormat String fieldNameFormat, Object... args) {
+        public NumberAssertions<Long, T, N> longField(Function<@NotNull N, @Nullable Long> longValueFn, String fieldName) {
             Function<N, Optional<Long>> fn = wrapOptional(longValueFn);
-            return new NumberAssertions<>(currentNestFn, fn, Long::compareTo, fieldNameFormat(fieldNameFormat, args), this);
+            return new NumberAssertions<>(currentValue, fn, Long::compareTo, () -> fieldNameFormat(currentFieldName, fieldName), this);
         }
 
-        public NumberAssertions<Double, T, N> doubleField(Function<@NotNull N, @Nullable Double> doubleValueFn, @PrintFormat String fieldNameFormat, Object... args) {
+        public NumberAssertions<Double, T, N> doubleField(Function<@NotNull N, @Nullable Double> doubleValueFn, String fieldName) {
             Function<N, Optional<Double>> fn = wrapOptional(doubleValueFn);
-            return new NumberAssertions<>(currentNestFn, fn, Double::compareTo, fieldNameFormat(fieldNameFormat, args), this);
+            return new NumberAssertions<>(currentValue, fn, Double::compareTo, () -> fieldNameFormat(currentFieldName, fieldName), this);
         }
 
-        public NumberAssertions<BigDecimal, T, N> decimalField(Function<@NotNull N, @Nullable BigDecimal> decimalValueFn, @PrintFormat String fieldNameFormat, Object... args) {
+        public NumberAssertions<BigDecimal, T, N> decimalField(Function<@NotNull N, @Nullable BigDecimal> decimalValueFn, String fieldName) {
             Function<N, Optional<BigDecimal>> fn = wrapOptional(decimalValueFn);
-            return new NumberAssertions<>(currentNestFn, fn, BigDecimal::compareTo, fieldNameFormat(fieldNameFormat, args), this);
+            return new NumberAssertions<>(currentValue, fn, BigDecimal::compareTo, () -> fieldNameFormat(currentFieldName, fieldName), this);
         }
 
         AssertionsChain<T, N> withRule(Rule<T> rule) {
@@ -383,35 +412,28 @@ public interface Valid<T> {
 
     final class NumberAssertions<R extends Number, T, N> {
 
-        private final Function<T, N> currentNestFn;
+        private final N currentValue;
         private final Function<@NotNull N, @NotNull Optional<R>> numberValueFn;
         private final Comparator<R> comparator;
         private final Supplier<String> fieldName;
         private final AssertionsChain<T, N> parent;
 
-        public NumberAssertions(Function<T, N> currentNestFn,
+        public NumberAssertions(N currentValue,
                                 Function<@NotNull N, @NotNull Optional<R>> numberValueFn,
                                 Comparator<R> comparator,
                                 Supplier<String> fieldName,
                                 AssertionsChain<T, N> parent) {
-            this.currentNestFn = currentNestFn;
+            this.currentValue = currentValue;
             this.numberValueFn = numberValueFn;
             this.comparator = comparator;
             this.fieldName = fieldName;
             this.parent = parent;
         }
 
-        /**
-         * Asserts that a value is greater than or equal to the specified target value.
-         *
-         * @param target the value to compare against; must not be null
-         * @return a {@link NullAssertions} object for further assertions
-         * @throws NullPointerException if the target is null
-         */
         public NullAssertions<R, T, N> isGte(R target) {
             Objects.requireNonNull(target);
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     numberValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -422,17 +444,10 @@ public interface Valid<T> {
             );
         }
 
-        /**
-         * Asserts that a value is less than or equal to the specified target value.
-         *
-         * @param target the value to compare against; must not be null
-         * @return a {@link NullAssertions} object for further assertions
-         * @throws NullPointerException if the target is null
-         */
         public NullAssertions<R, T, N> isLte(R target) {
             Objects.requireNonNull(target);
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     numberValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -443,21 +458,12 @@ public interface Valid<T> {
             );
         }
 
-        /**
-         * Asserts that a value is within the specified range, inclusive of the minimum and maximum targets.
-         * If the value is outside the range, the assertion will fail.
-         *
-         * @param minTarget the minimum value of the range; must not be null and must be less than or equal to {@code maxTarget}
-         * @param maxTarget the maximum value of the range; must not be null and must be greater than or equal to {@code minTarget}
-         * @return a {@link NullAssertions} object for further assertions
-         * @throws IllegalArgumentException if {@code minTarget} is greater than {@code maxTarget}
-         */
         public NullAssertions<R, T, N> isInRange(R minTarget, R maxTarget) {
             if (comparator.compare(minTarget, maxTarget) > 0) {
                 throw new IllegalArgumentException("minTarget must be less than maxTarget");
             }
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     numberValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -471,30 +477,24 @@ public interface Valid<T> {
 
     final class StringAssertions<T, N> {
 
-        private final Function<T, N> currentNestFn;
+        private final N currentValue;
         private final Function<@NotNull N, @NotNull Optional<String>> stringValueFn;
         private final Supplier<String> fieldName;
         private final AssertionsChain<T, N> parent;
 
-        public StringAssertions(Function<T, N> currentNestFn,
+        public StringAssertions(N currentValue,
                                 Function<@NotNull N, @NotNull Optional<String>> stringValueFn,
                                 Supplier<String> fieldName,
                                 AssertionsChain<T, N> parent) {
-            this.currentNestFn = currentNestFn;
+            this.currentValue = currentValue;
             this.stringValueFn = stringValueFn;
             this.fieldName = fieldName;
             this.parent = parent;
         }
 
-        /**
-         * Validates whether the field is either null or an empty string.
-         *
-         * @return an instance of {@code NullAssertions<String, T>} to further specify
-         * null or empty conditions for the field
-         */
         public NullAssertions<String, T, N> isEmpty() {
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     stringValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -505,16 +505,9 @@ public interface Valid<T> {
             );
         }
 
-        /**
-         * Validates whether the field is not blank, meaning it is neither null
-         * nor a string consisting only of whitespace characters.
-         *
-         * @return an instance of {@code NullAssertions<String, T>} to specify additional
-         * conditions or validations for the field
-         */
         public NullAssertions<String, T, N> isNotBlank() {
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     stringValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -525,20 +518,10 @@ public interface Valid<T> {
             );
         }
 
-        /**
-         * Validates whether the field has a specific string length.
-         * The validation ensures that the string length equals the specified value.
-         * This method can be chained with further assertions or validations.
-         *
-         * @param length the exact length that the string field must have
-         * @return an instance of {@code NullAssertions<String, T>} to specify further conditions
-         * or validations for the field
-         * @throws NullPointerException if the specified {@code length} is null
-         */
         public NullAssertions<String, T, N> hasLength(Integer length) {
             Objects.requireNonNull(length);
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     stringValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -549,20 +532,10 @@ public interface Valid<T> {
             );
         }
 
-        /**
-         * Validates whether the field has a minimum string length.
-         * The validation ensures that the string length is at least the specified
-         * minimum length. This method can be chained with further assertions or validations.
-         *
-         * @param minLength the minimum length that the string field must have
-         * @return an instance of {@code NullAssertions<String, T>} to specify additional
-         * conditions or validations for the field
-         * @throws NullPointerException if the specified {@code minLength} is null
-         */
         public NullAssertions<String, T, N> hasMinLength(Integer minLength) {
             Objects.requireNonNull(minLength);
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     stringValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -574,20 +547,10 @@ public interface Valid<T> {
             );
         }
 
-        /**
-         * Validates whether the field has a maximum string length.
-         * The validation ensures that the string length does not exceed the specified maximum length.
-         * This method can be chained with further assertions or validations.
-         *
-         * @param maxLength the maximum length that the string field must have
-         * @return an instance of {@code NullAssertions<String, T>} to specify additional
-         * conditions or validations for the field
-         * @throws NullPointerException if the specified {@code maxLength} is null
-         */
         public NullAssertions<String, T, N> hasMaxLength(Integer maxLength) {
             Objects.requireNonNull(maxLength);
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     stringValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -598,23 +561,11 @@ public interface Valid<T> {
             );
         }
 
-        /**
-         * Validates whether the field has a string length within the specified range.
-         * The validation ensures that the string length is between the given minimum and
-         * maximum values (inclusive). This method can be chained with further assertions
-         * or validations.
-         *
-         * @param minLength the minimum permissible length of the string
-         * @param maxLength the maximum permissible length of the string
-         * @return an instance of {@code NullAssertions<String, T>} to specify additional
-         * conditions or validations for the field
-         * @throws NullPointerException if either {@code minLength} or {@code maxLength} is null
-         */
         public NullAssertions<String, T, N> hasLengthRange(Integer minLength, Integer maxLength) {
             Objects.requireNonNull(minLength);
             Objects.requireNonNull(maxLength);
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     stringValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -638,7 +589,7 @@ public interface Valid<T> {
         public NullAssertions<String, T, N> matches(Pattern pattern) {
             Objects.requireNonNull(pattern);
             return new NullAssertions<>(
-                    currentNestFn,
+                    currentValue,
                     stringValueFn,
                     fieldName,
                     (fieldName, allowNull) -> (allowNull ?
@@ -652,21 +603,20 @@ public interface Valid<T> {
 
     final class NullAssertions<R, T, N> {
 
-        private final Function<T, N> currentNestFn;
+        private final N currentValue;
         private final Function<@NotNull N, @NotNull Optional<R>> valueFn;
         private final Supplier<String> fieldNameSupplier;
         private final BiFunction<String, Boolean, String> messageFn;
         private final Function<@NotNull R, Boolean> condition;
         private final AssertionsChain<T, N> parent;
 
-        public NullAssertions(
-                Function<T, N> currentNestFn,
-                Function<@NotNull N, @NotNull Optional<R>> valueFn,
-                Supplier<String> fieldNameSupplier,
-                BiFunction<String, Boolean, String> messageFn,
-                Function<@NotNull R, Boolean> condition,
-                AssertionsChain<T, N> parent) {
-            this.currentNestFn = currentNestFn;
+        public NullAssertions(N currentValue,
+                              Function<@NotNull N, @NotNull Optional<R>> valueFn,
+                              Supplier<String> fieldNameSupplier,
+                              BiFunction<String, Boolean, String> messageFn,
+                              Function<@NotNull R, Boolean> condition,
+                              AssertionsChain<T, N> parent) {
+            this.currentValue = currentValue;
             this.valueFn = valueFn;
             this.fieldNameSupplier = fieldNameSupplier;
             this.messageFn = messageFn;
@@ -683,7 +633,7 @@ public interface Valid<T> {
          */
         public AssertionsChain<T, N> allowingNull() {
             return parent.withRule(t -> {
-                var val = valueFn.apply(currentNestFn.apply(t));
+                var val = valueFn.apply(currentValue);
                 if (val.isPresent() && !condition.apply(val.get())) {
                     var fieldName = fieldNameSupplier.get();
                     return Optional.of(Violation.of(fieldName, messageFn.apply(fieldName, true)));
@@ -701,7 +651,7 @@ public interface Valid<T> {
          */
         public AssertionsChain<T, N> rejectingNull() {
             return parent.withRule(t -> {
-                var val = valueFn.apply(currentNestFn.apply(t));
+                var val = valueFn.apply(currentValue);
                 if (val.isEmpty() || !condition.apply(val.get())) {
                     var fieldName = fieldNameSupplier.get();
                     return Optional.of(Violation.of(fieldName, messageFn.apply(fieldName, false)));
@@ -873,8 +823,8 @@ public interface Valid<T> {
         return t -> Optional.ofNullable(fn.apply(t));
     }
 
-    private static Supplier<String> fieldNameFormat(@PrintFormat String format, Object... args) {
-        return () -> format.formatted(args);
+    private static String fieldNameFormat(String currentObjectField, String field) {
+        return currentObjectField.isEmpty() ? field : currentObjectField + "." + field;
     }
 
     @SuppressWarnings("unchecked")
