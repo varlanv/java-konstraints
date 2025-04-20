@@ -6,10 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
+import java.util.function.*;
 import java.util.regex.Pattern;
 
 @NotNullByDefault
@@ -48,7 +45,7 @@ public interface Valid<T> {
         return new Invalid<>(List.copyOf(violations));
     }
 
-    static <T> ValidationSpec<T> validationSpec(BiFunction<T, AssertionsChain<T, T>, AssertionsChain<T, ?>> specAction) {
+    static <T> ValidationSpec<T> validationSpec(Function<AssertionsSpec<T, T>, AssertionsSpec<T, ?>> specAction) {
         return ValidationSpec.fromFn(specAction);
     }
 
@@ -62,7 +59,7 @@ public interface Valid<T> {
 
         Valid<T> validate(T t);
 
-        static <T> ValidationSpec<T> fromFn(BiFunction<T, AssertionsChain<T, T>, AssertionsChain<T, ?>> specAction) {
+        static <T> ValidationSpec<T> fromFn(Function<AssertionsSpec<T, T>, AssertionsSpec<T, ?>> specAction) {
             Objects.requireNonNull(specAction);
             return new ValidationSpec<>() {
                 @Override
@@ -86,8 +83,8 @@ public interface Valid<T> {
                 public Valid<T> validate(T t) {
                     Objects.requireNonNull(t);
                     var violations = new ArrayList<Violation>(1);
-                    var chain = new AssertionsChain<T, T>(t, violations);
-                    specAction.apply(t, chain);
+                    var chain = new AssertionsSpec<T, T>(t, violations);
+                    specAction.apply(chain);
                     if (violations.isEmpty()) {
                         return Valid.ofValid(t);
                     } else {
@@ -131,25 +128,182 @@ public interface Valid<T> {
         }
     }
 
+    final class AssertionsSpec<T, N> {
+
+        private final Supplier<String> fieldName;
+        private final N currentValue;
+        private final List<Violation> violations;
+
+        public AssertionsSpec(N currentValue, List<Violation> violations) {
+            this(() -> "", currentValue, violations);
+        }
+
+        public AssertionsSpec(Supplier<String> fieldName, N currentValue, List<Violation> violations) {
+            this.fieldName = fieldName;
+            this.currentValue = currentValue;
+            this.violations = violations;
+        }
+
+        public FieldSpec<T, N> field(String fieldName) {
+            return new FieldSpec<>(fieldName, this);
+        }
+
+        public N value() {
+            return currentValue;
+        }
+
+        AssertionsSpec<T, N> withViolation(Violation violation) {
+            violations.add(violation);
+            return this;
+        }
+
+        List<Violation> violations() {
+            return violations;
+        }
+    }
+
     final class IterableSpec<A, R, I extends Iterable<R>, T, N> {
 
-        private final Supplier<Optional<I>> valueFn;
+        private final I value;
         private final String fieldName;
         private final NullSpec<T, N> nullSpec;
-        private final Function<Supplier<Optional<R>>, A> assertionsSupplier;
+        private final BiFunction<Integer, Supplier<Optional<R>>, A> assertionsSupplier;
+        @Nullable
+        private Supplier<List<R>> listSupplier;
 
-        public IterableSpec(Supplier<Optional<I>> valueFn,
+        public IterableSpec(I value,
                             String fieldName,
                             NullSpec<T, N> nullSpec,
-                            Function<Supplier<Optional<R>>, A> assertionsSupplier) {
-            this.valueFn = valueFn;
+                            BiFunction<Integer, Supplier<Optional<R>>, A> assertionsSupplier) {
+            this.value = value;
             this.fieldName = fieldName;
             this.nullSpec = nullSpec;
             this.assertionsSupplier = assertionsSupplier;
         }
 
-        public AssertionsChain<T, N> eachItem(Function<A, AssertionsChain<T, N>> specAction) {
+        public I value() {
+            return value;
+        }
+
+        public AssertionsSpec<T, N> eachItem(Function<A, A> specAction) {
+            var list = list();
+            for (int idx = 0, listSize = list.size(); idx < listSize; idx++) {
+                var item = list.get(idx);
+                if (item != null) {
+                    specAction.apply(assertionsSupplier.apply(idx, () -> Optional.of(item)));
+                }
+            }
             return nullSpec.parent();
+        }
+
+        public IterableSpec<A, R, I, T, N> assertNoNullValues() {
+            var list = list();
+            for (int idx = 0, listSize = list.size(); idx < listSize; idx++) {
+                var item = list.get(idx);
+                if (item == null) {
+                    nullSpec.parent().withViolation(Violation.of(fieldName + "[" + idx + "]", "expected to be non-null item at index [%d]".formatted(idx)));
+                }
+            }
+            return this;
+        }
+
+        public IterableSpec<A, R, I, T, N> assertNotEmpty() {
+            return check(
+                    () -> "expected to be null or non-empty",
+                    () -> "expected to be non-null and non-empty",
+                    Predicate.not(List::isEmpty)
+            );
+        }
+
+        public IterableSpec<A, R, I, T, N> assertEmpty() {
+            return check(
+                    () -> "expected to be null or empty",
+                    () -> "expected to be non-null and empty",
+                    List::isEmpty
+            );
+        }
+
+        public IterableSpec<A, R, I, T, N> assertSize(Integer size) {
+            if (size <= 0) {
+                throw new IllegalArgumentException("size must be greater than 0");
+            }
+            return check(
+                    () -> "expected to be null or have size [%d]".formatted(size),
+                    () -> "expected to be non-null and have size [%d]".formatted(size),
+                    rs -> rs.size() == size
+            );
+        }
+
+        public IterableSpec<A, R, I, T, N> assertMinSize(Integer minSize) {
+            if (minSize <= 0) {
+                throw new IllegalArgumentException("minSize must be greater than 0");
+            }
+            return check(
+                    () -> "expected to be null or have size at least [%d]".formatted(minSize),
+                    () -> "expected to be non-null and have size at least [%d]".formatted(minSize),
+                    rs -> rs.size() >= minSize
+            );
+        }
+
+        public IterableSpec<A, R, I, T, N> assertMaxSize(Integer maxSize) {
+            if (maxSize <= 0) {
+                throw new IllegalArgumentException("maxSize must be greater than 0");
+            }
+            return check(
+                    () -> "expected to be null or have size at most [%d]".formatted(maxSize),
+                    () -> "expected to be non-null and have size at most [%d]".formatted(maxSize),
+                    rs -> rs.size() <= maxSize
+            );
+        }
+
+        public IterableSpec<A, R, I, T, N> assertSizeRange(Integer minSize, Integer maxSize) {
+            if (minSize < 0) {
+                throw new IllegalArgumentException("minSize must be greater than or equal to 0");
+            } else if (maxSize <= 0) {
+                throw new IllegalArgumentException("maxSize must be greater than 0");
+            } else if (minSize >= maxSize) {
+                throw new IllegalArgumentException("minSize must be less than maxSize");
+            }
+            return check(
+                    () -> "expected to be null or have size in range [%d - %d]".formatted(minSize, maxSize),
+                    () -> "expected to be non-null or have size in range [%d - %d]".formatted(minSize, maxSize),
+                    rs -> rs.size() >= minSize && rs.size() <= maxSize
+            );
+        }
+
+        private IterableSpec<A, R, I, T, N> check(Supplier<String> nullableMessage,
+                                                  Supplier<String> nonNullMessage,
+                                                  Predicate<@NotNull List<R>> condition) {
+            var list = list();
+            if (!condition.test(list)) {
+                if (!nullSpec.allowNull()) {
+                    nullSpec.parent().withViolation(Violation.of(fieldName, nonNullMessage.get()));
+                } else {
+                    nullSpec.parent().withViolation(Violation.of(fieldName, nullableMessage.get()));
+                }
+            }
+            return this;
+        }
+
+        private List<@Nullable R> list() {
+            var supplier = listSupplier;
+            if (supplier == null) {
+                List<R> list = null;
+                for (var item : value) {
+                    if (list == null) {
+                        list = new ArrayList<>();
+                    }
+                    list.add(item);
+                }
+                if (list == null) {
+                    supplier = List::of;
+                } else {
+                    var objects = Collections.unmodifiableList(list);
+                    supplier = () -> objects;
+                }
+                listSupplier = supplier;
+            }
+            return supplier.get();
         }
     }
 
@@ -161,326 +315,502 @@ public interface Valid<T> {
             this.nullSpec = nullSpec;
         }
 
-        public <I extends Iterable<String>> AssertionsChain<T, N> strings(Function<@NotNull N, @Nullable I> valueFn,
-                                                                          String fieldName,
-                                                                          Function<IterableSpec<StringAssertions<T, N>, String, I, T, N>, AssertionsChain<T, N>> s) {
-            ;
-            return s.apply(new IterableSpec<>(
-                    wrapOptionalSupplier(valueFn).apply(nullSpec.currentValue),
-                    fieldName,
-                    nullSpec,
-                    val -> new StringAssertions<>(val, () -> "", nullSpec)));
+        public <I extends Iterable<String>> AssertionsSpec<T, N> strings(Function<@NotNull N, @Nullable I> valueFn,
+                                                                         Function<IterableSpec<IndexedStringAssertions<T, N>, String, I, T, N>, AssertionsSpec<T, N>> specAction) {
+            @Nullable
+            var value = valueFn.apply(nullSpec.parent().value());
+            if (value != null) {
+                specAction.apply(new IterableSpec<>(
+                                value,
+                                nullSpec.parent.parent.fieldName.get(),
+                                nullSpec,
+                                (idx, val) -> IndexedStringAssertions.forValue(
+                                        idx,
+                                        StringAssertions.forValue(
+                                                val.get().get(),
+                                                () -> nullSpec.parent.parent.fieldName.get() + "." + nullSpec.parent.fieldName + "[" + idx + "]",
+                                                nullSpec
+                                        )
+                                )
+                        )
+                );
+            }
+            return nullSpec.parent();
         }
 
-        public <R extends Comparable<R>, I extends Iterable<R>> AssertionsChain<T, N> numbers(Function<@NotNull N, @Nullable I> valueFn,
-                                                                                              String fieldName,
-                                                                                              Function<IterableSpec<NumberAssertions<R, T, N>, R, I, T, N>, AssertionsChain<T, N>> s) {
-            return s.apply(new IterableSpec<>(
-                    wrapOptionalSupplier(valueFn).apply(nullSpec.currentValue),
-                    fieldName,
-                    nullSpec,
-                    val -> new NumberAssertions<>(val, () -> "", nullSpec)));
+        public <R extends Comparable<R>, I extends Iterable<R>> AssertionsSpec<T, N> numbers(Function<@NotNull N, @Nullable I> valueFn,
+                                                                                             String fieldName,
+                                                                                             Function<IterableSpec<IndexedNumberAssertions<R, T, N>, R, I, T, N>, AssertionsSpec<T, N>> specAction) {
+            @Nullable
+            var value = valueFn.apply(nullSpec.parent().value());
+            if (value != null) {
+                specAction.apply(new IterableSpec<>(
+                                value,
+                                nullSpec.parent.parent.fieldName.get(),
+                                nullSpec,
+                                (idx, val) -> IndexedNumberAssertions.forValue(
+                                        idx,
+                                        NumberAssertions.forValue(
+                                                val.get().get(),
+                                                () -> nullSpec.parent.parent.fieldName.get() + "." + nullSpec.parent.fieldName + "[" + idx + "]",
+                                                nullSpec
+                                        )
+                                )
+                        )
+                );
+            }
+            return nullSpec.parent();
+        }
+    }
+
+    final class FieldSpec<T, N> {
+
+        private final String fieldName;
+        private final AssertionsSpec<T, N> parent;
+
+        public FieldSpec(String fieldName, AssertionsSpec<T, N> parent) {
+            this.fieldName = fieldName;
+            this.parent = parent;
         }
 
-        public <R,I extends Iterable<R>> AssertionsChain<T, N> nested(Function<@NotNull N, @Nullable I> valueFn,
-                                                                         String fieldName,
-                                                                         Function<IterableSpec<StringAssertions<T, N>, String, I, T, N>, AssertionsChain<T, N>> s) {
-            return s.apply(new IterableSpec<>(
-                    wrapOptionalSupplier(valueFn).apply(nullSpec.currentValue),
-                    fieldName,
-                    nullSpec,
-                    val -> new StringAssertions<>(val, () -> "", nullSpec)));
+        public NullSpec<T, N> nullable() {
+            return new NullSpec<>(true, this);
+        }
+
+        public NullSpec<T, N> nonNull() {
+            return new NullSpec<>(false, this);
+        }
+
+
+        public AssertionsSpec<T, N> assertNull(Function<@NotNull N, @Nullable Object> valueFn) {
+            if (valueFn.apply(parent.value()) != null) {
+                return parent.withViolation(Violation.of(fieldName, "expected to be null"));
+            } else {
+                return parent;
+            }
+        }
+
+        public AssertionsSpec<T, N> assertNotNull(Function<@NotNull N, @Nullable Object> valueFn) {
+            if (valueFn.apply(parent.value()) == null) {
+                return parent.withViolation(Violation.of(fieldName, "expected to be non-null"));
+            } else {
+                return parent;
+            }
         }
     }
 
     final class NullSpec<T, N> {
 
-        private final AssertionsChain<T, N> parent;
-        private final String currentFieldName;
-        private final N currentValue;
         private final Boolean allowNull;
+        private final FieldSpec<T, N> parent;
 
-        public NullSpec(AssertionsChain<T, N> parent,
-                        String currentFieldName,
-                        N currentValue,
-                        Boolean allowNull) {
-            this.parent = parent;
-            this.currentFieldName = currentFieldName;
-            this.currentValue = currentValue;
+        public NullSpec(Boolean allowNull,
+                        FieldSpec<T, N> parent) {
             this.allowNull = allowNull;
+            this.parent = parent;
         }
 
-        public StringAssertions<T, N> stringField(Function<@NotNull N, @Nullable String> stringValueFn,
-                                                  String fieldName) {
-            return new StringAssertions<>(
-                    wrapOptionalSupplier(stringValueFn).apply(currentValue),
-                    () -> fieldNameFormat(currentFieldName, fieldName),
-                    this
-            );
+        public AssertionsSpec<T, N> string(Function<@NotNull N, @Nullable String> valueFn,
+                                           Function<StringAssertions<T, N>, StringAssertions<T, N>> specAction) {
+            @Nullable
+            var val = valueFn.apply(parent.parent.value());
+            if (val != null) {
+                specAction.apply(
+                        StringAssertions.forValue(
+                                val,
+                                fieldNameFormatSupplier(parent.parent.fieldName, parent.fieldName),
+                                this
+                        )
+                );
+            }
+            return parent();
         }
 
-        public <R extends Comparable<R>> NumberAssertions<R, T, N> numberField(Function<@NotNull N, @Nullable R> valueFn,
-                                                                               String fieldName) {
-            return new NumberAssertions<>(
-                    wrapOptionalSupplier(valueFn).apply(currentValue),
-                    () -> fieldNameFormat(currentFieldName, fieldName),
-                    this
-            );
+        public <R extends Comparable<R>> AssertionsSpec<T, N> number(Function<@NotNull N, @Nullable R> valueFn,
+                                                                     Function<NumberAssertions<R, T, N>, NumberAssertions<R, T, N>> specAction) {
+            @Nullable
+            var val = valueFn.apply(parent.parent.value());
+            if (val != null) {
+                specAction.apply(
+                        NumberAssertions.forValue(
+                                val,
+                                fieldNameFormatSupplier(parent.parent.fieldName, parent.fieldName),
+                                this
+                        )
+                );
+            }
+            return parent();
         }
 
-        public IterablePickSpec<T, N> iterableField() {
+        public IterablePickSpec<T, N> iterable() {
             return new IterablePickSpec<>(this);
         }
 
 
-        public <R> AssertionsChain<T, N> nestedField(Function<@NotNull N, @Nullable R> valueFn,
-                                                     String fieldName,
-                                                     BiFunction<R, AssertionsChain<T, R>, AssertionsChain<T, R>> specAction) {
-            var newValue = valueFn.apply(currentValue);
-            if (newValue == null) {
-                return parent.withViolation(Violation.of(currentFieldName, "Field [%s] is expected to be non-null".formatted(currentFieldName)));
+        public <R> AssertionsSpec<T, N> nested(Function<@NotNull N, @Nullable R> valueFn,
+                                               Function<AssertionsSpec<T, R>, AssertionsSpec<T, R>> specAction) {
+            @Nullable
+            var val = valueFn.apply(parent.parent.value());
+            if (val != null) {
+                specAction.apply(
+                        new AssertionsSpec<>(
+                                fieldNameFormatSupplier(parent.parent.fieldName, parent.fieldName),
+                                val,
+                                parent.parent.violations()
+                        )
+                );
             }
-            var newFieldName = currentFieldName.isEmpty() ? fieldName : currentFieldName + "." + fieldName;
-            specAction.apply(newValue, new AssertionsChain<>(newFieldName, newValue, parent.violations()));
-            return parent;
+            return parent();
         }
 
         Boolean allowNull() {
             return allowNull;
         }
 
-        AssertionsChain<T, N> parent() {
-            return parent;
+        AssertionsSpec<T, N> parent() {
+            return parent.parent;
         }
     }
 
-    final class AssertionsChain<T, N> {
+    interface IndexedNumberAssertions<R extends Comparable<R>, T, N> extends NumberAssertions<R, T, N> {
 
-        private final String currentFieldName;
-        private final N currentValue;
-        private final List<Violation> violations;
+        int index();
 
-        public AssertionsChain(N currentValue, List<Violation> violations) {
-            this.currentFieldName = "";
-            this.currentValue = currentValue;
-            this.violations = violations;
-        }
+        IndexedNumberAssertions<R, T, N> assertGte(R target);
 
-        public AssertionsChain(String currentFieldName, N currentValue, List<Violation> violations) {
-            if (currentFieldName.isBlank()) {
-                throw new IllegalArgumentException("Field name must not be blank");
-            }
-            this.currentFieldName = currentFieldName;
-            this.currentValue = currentValue;
-            this.violations = violations;
-        }
+        IndexedNumberAssertions<R, T, N> assertLte(R target);
 
-        public AssertionsChain<T, N> assertNull(Function<@NotNull N, @Nullable Object> valueFn, String fieldName) {
-            if (valueFn.apply(currentValue) != null) {
-                return withViolation(Violation.of(fieldName, "Field [%s] is expected to be null".formatted(fieldNameFormat(currentFieldName, fieldName))));
-            } else {
-                return this;
-            }
-        }
+        IndexedNumberAssertions<R, T, N> assertInRange(R minTarget, R maxTarget);
 
-        public AssertionsChain<T, N> assertNotNull(Function<@NotNull N, @Nullable Object> valueFn, String fieldName) {
-            if (valueFn.apply(currentValue) == null) {
-                return withViolation(Violation.of(fieldName, "Field [%s] is expected to be non-null".formatted(fieldNameFormat(currentFieldName, fieldName))));
-            } else {
-                return this;
-            }
-        }
+        static <R extends Comparable<R>, T, N> IndexedNumberAssertions<R, T, N> forValue(int index, NumberAssertions<R, T, N> delegate) {
+            return new IndexedNumberAssertions<>() {
+                @Override
+                public R value() {
+                    return delegate.value();
+                }
 
-        public NullSpec<T, N> nullable() {
-            return new NullSpec<>(this, currentFieldName, currentValue, true);
-        }
+                @Override
+                public IndexedNumberAssertions<R, T, N> assertGte(R target) {
+                    delegate.assertGte(target);
+                    return this;
+                }
 
-        public NullSpec<T, N> nonNull() {
-            return new NullSpec<>(this, currentFieldName, currentValue, false);
-        }
+                @Override
+                public IndexedNumberAssertions<R, T, N> assertLte(R target) {
+                    delegate.assertLte(target);
+                    return this;
+                }
 
-        AssertionsChain<T, N> withViolation(Violation violation) {
-            violations.add(violation);
-            return this;
-        }
+                @Override
+                public IndexedNumberAssertions<R, T, N> assertInRange(R minTarget, R maxTarget) {
+                    delegate.assertInRange(minTarget, maxTarget);
+                    return this;
+                }
 
-        List<Violation> violations() {
-            return violations;
+                @Override
+                public IndexedNumberAssertions<R, T, N> assertIn(Collection<R> set) {
+                    delegate.assertIn(set);
+                    return this;
+                }
+
+                @Override
+                public int index() {
+                    return index;
+                }
+            };
         }
     }
 
-    final class NumberAssertions<R extends Comparable<R>, T, N> {
+    interface NumberAssertions<R extends Comparable<R>, T, N> {
 
-        private final Supplier<Optional<R>> valueSupplier;
-        private final Supplier<String> fieldName;
-        private final NullSpec<T, N> nullSpec;
-        private final Comparator<R> comparator;
+        R value();
 
-        public NumberAssertions(Supplier<Optional<R>> valueSupplier,
-                                Supplier<String> fieldName,
-                                NullSpec<T, N> nullSpec) {
-            this.valueSupplier = valueSupplier;
-            this.fieldName = fieldName;
-            this.nullSpec = nullSpec;
-            this.comparator = Comparable::compareTo;
-        }
+        NumberAssertions<R, T, N> assertGte(R target);
 
-        public AssertionsChain<T, N> isGte(R target) {
-            Objects.requireNonNull(target);
-            return check(
-                    valueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or number greater than or equal to [%s]".formatted(target),
-                    "must be not null and greater than or equal to [%s]".formatted(target),
-                    val -> comparator.compare(val, target) >= 0
-            );
-//            );
-        }
+        NumberAssertions<R, T, N> assertLte(R target);
 
-        public AssertionsChain<T, N> isLte(R target) {
-            Objects.requireNonNull(target);
-            return check(
-                    valueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or number less than [%s]".formatted(target),
-                    "must be not null and less than [%s]".formatted(target),
-                    val -> comparator.compare(val, target) <= 0
-            );
-        }
+        NumberAssertions<R, T, N> assertInRange(R minTarget, R maxTarget);
 
-        public AssertionsChain<T, N> isInRange(R minTarget, R maxTarget) {
-            if (comparator.compare(minTarget, maxTarget) > 0) {
-                throw new IllegalArgumentException("minTarget must be less than maxTarget");
-            }
-            return check(
-                    valueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or integer in range [%s - %s]".formatted(minTarget, maxTarget),
-                    "must be not null and in range [%s - %s]".formatted(minTarget, maxTarget),
-                    val -> comparator.compare(val, minTarget) >= 0 && comparator.compare(val, maxTarget) <= 0
-            );
+        NumberAssertions<R, T, N> assertIn(Collection<R> set);
+
+        static <R extends Comparable<R>, T, N> NumberAssertions<R, T, N> forValue(R value,
+                                                                                  Supplier<String> fieldName,
+                                                                                  NullSpec<T, N> nullSpec) {
+            Comparator<R> comparator = Comparable::compareTo;
+            return new NumberAssertions<>() {
+
+                @Override
+                public R value() {
+                    return value;
+                }
+
+                @Override
+                public NumberAssertions<R, T, N> assertGte(R target) {
+                    Objects.requireNonNull(target);
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must be greater than or equal to [%s]".formatted(target),
+                            val -> comparator.compare(val, target) >= 0
+                    );
+                }
+
+                @Override
+                public NumberAssertions<R, T, N> assertLte(R target) {
+                    Objects.requireNonNull(target);
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must be less than or equal to [%s]".formatted(target),
+                            val -> comparator.compare(val, target) <= 0
+                    );
+                }
+
+                @Override
+                public NumberAssertions<R, T, N> assertInRange(R minTarget, R maxTarget) {
+                    if (comparator.compare(minTarget, maxTarget) > 0) {
+                        throw new IllegalArgumentException("minTarget must be less than maxTarget");
+                    }
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must be in range [%s - %s]".formatted(minTarget, maxTarget),
+                            val -> comparator.compare(val, minTarget) >= 0 && comparator.compare(val, maxTarget) <= 0
+                    );
+                }
+
+                @Override
+                public NumberAssertions<R, T, N> assertIn(Collection<R> set) {
+                    Objects.requireNonNull(set);
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "value is not allowed",
+                            set::contains
+                    );
+                }
+            };
         }
     }
 
-    private static <R, T, N> AssertionsChain<T, N> check(Supplier<@NotNull Optional<R>> valSupplier,
-                                                         NullSpec<T, N> nullSpec,
-                                                         Supplier<String> fieldNameSupplier,
-                                                         String nullableFailMessage,
-                                                         String nonNullFailMessage,
-                                                         Function<@NotNull R, @NotNull Boolean> condition) {
-        var maybeVal = valSupplier.get();
-        if (maybeVal.isEmpty()) {
-            if (!nullSpec.allowNull()) {
-                return nullSpec.parent().withViolation(Violation.of(fieldNameSupplier.get(), nullableFailMessage));
-            }
-        } else {
-            var val = maybeVal.get();
-            if (!condition.apply(val)) {
-                return nullSpec.parent().withViolation(Violation.of(fieldNameSupplier.get(), nonNullFailMessage));
-            }
+    private static <A, R, T, N> A check(A self,
+                                        R val,
+                                        NullSpec<T, N> nullSpec,
+                                        Supplier<String> fieldNameSupplier,
+                                        String nonNullFailMessage,
+                                        Predicate<R> condition) {
+
+        if (!condition.test(val)) {
+            nullSpec.parent().withViolation(Violation.of(fieldNameSupplier.get(), nonNullFailMessage));
+            return self;
         }
-        return nullSpec.parent();
+        return self;
     }
 
-    final class StringAssertions<T, N> {
+    interface IndexedStringAssertions<T, N> extends StringAssertions<T, N> {
 
-        private final Supplier<Optional<String>> stringValueSupplier;
-        private final Supplier<String> fieldName;
-        private final NullSpec<T, N> nullSpec;
+        int index();
 
-        public StringAssertions(Supplier<Optional<String>> stringValueSupplier,
-                                Supplier<String> fieldName,
-                                NullSpec<T, N> nullSpec) {
-            this.stringValueSupplier = stringValueSupplier;
-            this.fieldName = fieldName;
-            this.nullSpec = nullSpec;
+        IndexedStringAssertions<T, N> assertEmpty();
+
+        IndexedStringAssertions<T, N> assertNotBlank();
+
+        IndexedStringAssertions<T, N> assertLength(Integer length);
+
+        IndexedStringAssertions<T, N> assertMinLength(Integer minLength);
+
+        IndexedStringAssertions<T, N> assertMaxLength(Integer maxLength);
+
+        IndexedStringAssertions<T, N> assertLengthRange(Integer minLength, Integer maxLength);
+
+        IndexedStringAssertions<T, N> assertMatches(Pattern pattern);
+
+        static <T, N> IndexedStringAssertions<T, N> forValue(int index,
+                                                             StringAssertions<T, N> delegate) {
+            return new IndexedStringAssertions<>() {
+
+                @Override
+                public int index() {
+                    return index;
+                }
+
+                @Override
+                public String value() {
+                    return delegate.value();
+                }
+
+                @Override
+                public IndexedStringAssertions<T, N> assertEmpty() {
+                    delegate.assertEmpty();
+                    return this;
+                }
+
+                @Override
+                public IndexedStringAssertions<T, N> assertNotBlank() {
+                    delegate.assertNotBlank();
+                    return this;
+                }
+
+                @Override
+                public IndexedStringAssertions<T, N> assertLength(Integer length) {
+                    delegate.assertLength(length);
+                    return this;
+                }
+
+                @Override
+                public IndexedStringAssertions<T, N> assertMinLength(Integer minLength) {
+                    delegate.assertMinLength(minLength);
+                    return this;
+                }
+
+                @Override
+                public IndexedStringAssertions<T, N> assertMaxLength(Integer maxLength) {
+                    delegate.assertMaxLength(maxLength);
+                    return this;
+                }
+
+                @Override
+                public IndexedStringAssertions<T, N> assertLengthRange(Integer minLength, Integer maxLength) {
+                    delegate.assertLengthRange(minLength, maxLength);
+                    return this;
+                }
+
+                @Override
+                public IndexedStringAssertions<T, N> assertMatches(Pattern pattern) {
+                    delegate.assertMatches(pattern);
+                    return this;
+                }
+            };
         }
+    }
 
+    interface StringAssertions<T, N> {
 
-        public AssertionsChain<T, N> assertEmpty() {
-            return check(
-                    stringValueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or empty string",
-                    "must be not null and empty string",
-                    String::isEmpty
-            );
-        }
+        String value();
 
-        public AssertionsChain<T, N> assertNotBlank() {
-            return check(
-                    stringValueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or non-blank string",
-                    "must be not null and non-blank string",
-                    val -> !val.isBlank()
-            );
-        }
+        StringAssertions<T, N> assertEmpty();
 
-        public AssertionsChain<T, N> assertLength(Integer length) {
-            Objects.requireNonNull(length);
-            return check(
-                    stringValueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or string with length [%d]".formatted(length),
-                    "must be not null and have length [%d]".formatted(length),
-                    val -> val.length() == length
-            );
-        }
+        StringAssertions<T, N> assertNotBlank();
 
-        public AssertionsChain<T, N> assertMinLength(Integer minLength) {
-            Objects.requireNonNull(minLength);
-            return check(
-                    stringValueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or string with min length [%d]".formatted(minLength),
-                    "must be not null and have min length [%d]".formatted(minLength),
-                    val -> val.length() >= minLength
-            );
-        }
+        StringAssertions<T, N> assertLength(Integer length);
 
-        public AssertionsChain<T, N> assertMaxLength(Integer maxLength) {
-            Objects.requireNonNull(maxLength);
-            return check(
-                    stringValueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or string with max length [%d]".formatted(maxLength),
-                    "must be not null and have max length [%d]".formatted(maxLength),
-                    val -> val.length() <= maxLength
-            );
-        }
+        StringAssertions<T, N> assertMinLength(Integer minLength);
 
-        public AssertionsChain<T, N> assertLengthRange(Integer minLength, Integer maxLength) {
-            Objects.requireNonNull(minLength);
-            Objects.requireNonNull(maxLength);
-            return check(
-                    stringValueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or string with length range [%d - %d]".formatted(minLength, maxLength),
-                    "must be not null and have length range [%d - %d]".formatted(minLength, maxLength),
-                    val -> val.length() >= minLength && val.length() <= maxLength
-            );
-        }
+        StringAssertions<T, N> assertMaxLength(Integer maxLength);
 
-        public AssertionsChain<T, N> assertMatches(Pattern pattern) {
-            Objects.requireNonNull(pattern);
-            return check(
-                    stringValueSupplier,
-                    nullSpec,
-                    fieldName,
-                    "must be null or string that matches pattern [%s]".formatted(pattern.pattern()),
-                    "must be not null and match pattern [%s]".formatted(pattern.pattern()),
-                    val -> pattern.matcher(val).matches()
-            );
+        StringAssertions<T, N> assertLengthRange(Integer minLength, Integer maxLength);
+
+        StringAssertions<T, N> assertMatches(Pattern pattern);
+
+        static <T, N> StringAssertions<T, N> forValue(String value,
+                                                      Supplier<String> fieldName,
+                                                      NullSpec<T, N> nullSpec) {
+
+            return new StringAssertions<>() {
+
+                @Override
+                public String value() {
+                    return value;
+                }
+
+                @Override
+                public StringAssertions<T, N> assertEmpty() {
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must be empty string",
+                            String::isEmpty
+                    );
+                }
+
+                @Override
+                public StringAssertions<T, N> assertNotBlank() {
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must be non-blank string",
+                            Predicate.not(String::isBlank)
+                    );
+                }
+
+                @Override
+                public StringAssertions<T, N> assertLength(Integer length) {
+                    Objects.requireNonNull(length);
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must have length [%d]".formatted(length),
+                            val -> val.length() == length
+                    );
+                }
+
+                @Override
+                public StringAssertions<T, N> assertMinLength(Integer minLength) {
+                    Objects.requireNonNull(minLength);
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must have min length [%d]".formatted(minLength),
+                            val -> val.length() >= minLength
+                    );
+                }
+
+                @Override
+                public StringAssertions<T, N> assertMaxLength(Integer maxLength) {
+                    Objects.requireNonNull(maxLength);
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must  have max length [%d]".formatted(maxLength),
+                            val -> val.length() <= maxLength
+                    );
+                }
+
+                @Override
+                public StringAssertions<T, N> assertLengthRange(Integer minLength, Integer maxLength) {
+                    Objects.requireNonNull(minLength);
+                    Objects.requireNonNull(maxLength);
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must have length range [%d - %d]".formatted(minLength, maxLength),
+                            val -> val.length() >= minLength && val.length() <= maxLength
+                    );
+                }
+
+                @Override
+                public StringAssertions<T, N> assertMatches(Pattern pattern) {
+                    Objects.requireNonNull(pattern);
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must match pattern [%s]".formatted(pattern.pattern()),
+                            val -> pattern.matcher(val).matches()
+                    );
+                }
+            };
         }
     }
 
@@ -491,14 +821,14 @@ public interface Valid<T> {
         private final Supplier<String> fieldNameSupplier;
         private final BiFunction<String, Boolean, String> messageFn;
         private final Function<@NotNull R, Boolean> condition;
-        private final AssertionsChain<T, N> parent;
+        private final AssertionsSpec<T, N> parent;
 
         public NullAssertions(N currentValue,
                               Function<@NotNull N, @NotNull Optional<R>> valueFn,
                               Supplier<String> fieldNameSupplier,
                               BiFunction<String, Boolean, String> messageFn,
                               Function<@NotNull R, Boolean> condition,
-                              AssertionsChain<T, N> parent) {
+                              AssertionsSpec<T, N> parent) {
             this.currentValue = currentValue;
             this.valueFn = valueFn;
             this.fieldNameSupplier = fieldNameSupplier;
@@ -507,7 +837,7 @@ public interface Valid<T> {
             this.parent = parent;
         }
 
-        public AssertionsChain<T, N> allowingNull() {
+        public AssertionsSpec<T, N> allowingNull() {
             var val = valueFn.apply(currentValue);
             if (val.isPresent() && !condition.apply(val.get())) {
                 var fieldName = fieldNameSupplier.get();
@@ -516,7 +846,7 @@ public interface Valid<T> {
             return parent;
         }
 
-        public AssertionsChain<T, N> rejectingNull() {
+        public AssertionsSpec<T, N> rejectingNull() {
             var val = valueFn.apply(currentValue);
             if (val.isEmpty() || !condition.apply(val.get())) {
                 var fieldName = fieldNameSupplier.get();
@@ -684,11 +1014,13 @@ public interface Valid<T> {
         }
     }
 
-    private static <T, R> Function<@NotNull T, @NotNull Optional<R>> wrapOptional(Function<@NotNull T, @Nullable R> fn) {
+    private static <
+            T, R> Function<@NotNull T, @NotNull Optional<R>> wrapOptional(Function<@NotNull T, @Nullable R> fn) {
         return t -> Optional.ofNullable(fn.apply(t));
     }
 
-    private static <T, R> Function<@NotNull T, @NotNull Supplier<@NotNull Optional<R>>> wrapOptionalSupplier(Function<@NotNull T, @Nullable R> fn) {
+    private static <
+            T, R> Function<@NotNull T, @NotNull Supplier<@NotNull Optional<R>>> wrapOptionalSupplier(Function<@NotNull T, @Nullable R> fn) {
         return t -> () -> Optional.ofNullable(fn.apply(t));
     }
 
@@ -696,7 +1028,9 @@ public interface Valid<T> {
         return currentObjectField.isEmpty() ? field : currentObjectField + "." + field;
     }
 
-    private static Supplier<String> fieldNameFormatSupplier(Supplier<String> currentObjectField, String field) {
+    private static Supplier<String> fieldNameFormatSupplier(
+            Supplier<String> currentObjectField,
+            String field) {
         return () -> fieldNameFormat(currentObjectField.get(), field);
     }
 
