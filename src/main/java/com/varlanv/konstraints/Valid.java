@@ -128,6 +128,38 @@ public interface Valid<T> {
         }
     }
 
+    final class IndexedAssertionsSpec<T, N> {
+
+        private final int index;
+        private final AssertionsSpec<T, N> delegate;
+
+        public IndexedAssertionsSpec(int index, AssertionsSpec<T, N> delegate) {
+            this.index = index;
+            this.delegate = delegate;
+        }
+
+        public FieldSpec<T, N> field(String fieldName) {
+            return new FieldSpec<>(fieldName, delegate);
+        }
+
+        public int index() {
+            return index;
+        }
+
+        public N value() {
+            return delegate.value();
+        }
+
+        IndexedAssertionsSpec<T, N> withViolation(Violation violation) {
+            delegate.violations().add(violation);
+            return this;
+        }
+
+        List<Violation> violations() {
+            return delegate.violations();
+        }
+    }
+
     final class AssertionsSpec<T, N> {
 
         private final Supplier<String> fieldName;
@@ -185,7 +217,7 @@ public interface Valid<T> {
             return value;
         }
 
-        public AssertionsSpec<T, N> eachItem(Function<A, A> specAction) {
+        public AssertionsSpec<T, N> eachItem(Function<A, ?> specAction) {
             var list = list();
             for (int idx = 0, listSize = list.size(); idx < listSize; idx++) {
                 var item = list.get(idx);
@@ -339,7 +371,6 @@ public interface Valid<T> {
         }
 
         public <R extends Comparable<R>, I extends Iterable<R>> AssertionsSpec<T, N> numbers(Function<@NotNull N, @Nullable I> valueFn,
-                                                                                             String fieldName,
                                                                                              Function<IterableSpec<IndexedNumberAssertions<R, T, N>, R, I, T, N>, AssertionsSpec<T, N>> specAction) {
             @Nullable
             var value = valueFn.apply(nullSpec.parent().value());
@@ -354,6 +385,29 @@ public interface Valid<T> {
                                                 val.get().get(),
                                                 () -> nullSpec.parent.parent.fieldName.get() + "." + nullSpec.parent.fieldName + "[" + idx + "]",
                                                 nullSpec
+                                        )
+                                )
+                        )
+                );
+            }
+            return nullSpec.parent();
+        }
+
+        public <R, I extends Iterable<R>> AssertionsSpec<T, N> nested(Function<@NotNull N, @Nullable I> valueFn,
+                                                                      Function<IterableSpec<IndexedAssertionsSpec<T, R>, R, I, T, N>, AssertionsSpec<T, N>> specAction) {
+            @Nullable
+            var value = valueFn.apply(nullSpec.parent().value());
+            if (value != null) {
+                specAction.apply(new IterableSpec<>(
+                                value,
+                                nullSpec.parent.parent.fieldName.get(),
+                                nullSpec,
+                                (idx, val) -> new IndexedAssertionsSpec<>(
+                                        idx,
+                                        new AssertionsSpec<>(
+                                                () -> nullSpec.parent.parent.fieldName.get() + "." + nullSpec.parent.fieldName + "[" + idx + "]",
+                                                val.get().get(),
+                                                nullSpec.parent().violations()
                                         )
                                 )
                         )

@@ -7,10 +7,13 @@ import java.util.stream.Collectors;
 
 public class Main {
 
-    public record NestedListVal(String val3) {
+    public record NestedListVal2(Integer val4) {
     }
 
-    public record Nested2(String val2, List<String> products, Set<NestedListVal> nestedListVals) {
+    public record NestedListVal1(String val3, List<NestedListVal2> nestedListVals2) {
+    }
+
+    public record Nested2(String val2, List<String> products, Set<NestedListVal1> nestedListVals) {
     }
 
     public record Nested1(String val1, Nested2 nested2) {
@@ -46,8 +49,22 @@ public class Main {
                                     .strings(Nested2::products, products -> products
                                             .eachItem(product -> product
                                                     .assertLength(4)))
-                            ))
-            )
+                                    .field("nestedListVals")
+                                    .nonNull()
+                                    .iterable()
+                                    .nested(Nested2::nestedListVals, nestedListVals -> nestedListVals
+                                            .eachItem(nestedListVal -> nestedListVal
+                                                    .field("val3")
+                                                    .nonNull()
+                                                    .string(NestedListVal1::val3, val3 -> val3.assertLength(1))
+                                                    .field("nestedListVals2")
+                                                    .nonNull()
+                                                    .iterable().nested(NestedListVal1::nestedListVals2, nestedListVals2 -> nestedListVals2
+                                                            .eachItem(nestedListVal2 -> nestedListVal2
+                                                                    .field("val4")
+                                                                    .nonNull()
+                                                                    .number(NestedListVal2::val4, val4 -> val4
+                                                                            .assertInRange(1, 6)))))))))
             .toValidationFunction();
 
     public static void main(String[] args) {
@@ -72,7 +89,14 @@ public class Main {
                                                 "testA",
                                                 "testB"
                                         ),
-                                        Set.of()
+                                        Set.of(
+                                                new NestedListVal1(
+                                                        "testC",
+                                                        List.of(
+                                                                new NestedListVal2(7)
+                                                        )
+                                                )
+                                        )
                                 )
                         )
                 )
