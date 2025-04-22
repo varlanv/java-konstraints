@@ -20,6 +20,8 @@ public interface Valid<T> {
 
     T orElseThrow(Function<List<Violation>, ? extends Throwable> exceptionFn);
 
+    Valid<T> switchIfInvalid(Supplier<Valid<T>> supplier);
+
     Optional<T> optional();
 
     boolean isValid();
@@ -178,6 +180,13 @@ public interface Valid<T> {
 
         public FieldSpec<T, N> field(String fieldName) {
             return new FieldSpec<>(fieldName, this);
+        }
+
+        public AssertionsSpec<T, N> assertCustom(Supplier<Boolean> assertion, Supplier<String> message) {
+            if (!assertion.get()) {
+                return withViolation(Violation.of(fieldName.get(), message.get()));
+            }
+            return this;
         }
 
         public N value() {
@@ -687,6 +696,12 @@ public interface Valid<T> {
 
         IndexedStringAssertions<T, N> assertMatches(Pattern pattern);
 
+        <E extends Enum<E>> IndexedStringAssertions<T, N> assertInEnum(Class<E> enumValue);
+
+        <E extends Enum<E>> IndexedStringAssertions<T, N> assertInEnum(Class<E> enumValue, Function<E, String> enumValueToNameFn);
+
+        IndexedStringAssertions<T, N> assertValidUUID();
+
         static <T, N> IndexedStringAssertions<T, N> forValue(int index,
                                                              StringAssertions<T, N> delegate) {
             return new IndexedStringAssertions<>() {
@@ -742,6 +757,24 @@ public interface Valid<T> {
                     delegate.assertMatches(pattern);
                     return this;
                 }
+
+                @Override
+                public IndexedStringAssertions<T, N> assertValidUUID() {
+                    delegate.assertValidUUID();
+                    return this;
+                }
+
+                @Override
+                public <E extends Enum<E>> IndexedStringAssertions<T, N> assertInEnum(Class<E> enumValue) {
+                    delegate.assertInEnum(enumValue);
+                    return this;
+                }
+
+                @Override
+                public <E extends Enum<E>> IndexedStringAssertions<T, N> assertInEnum(Class<E> enumValue, Function<E, String> enumValueToNameFn) {
+                    delegate.assertInEnum(enumValue, enumValueToNameFn);
+                    return this;
+                }
             };
         }
     }
@@ -763,6 +796,12 @@ public interface Valid<T> {
         StringAssertions<T, N> assertLengthRange(Integer minLength, Integer maxLength);
 
         StringAssertions<T, N> assertMatches(Pattern pattern);
+
+        StringAssertions<T, N> assertValidUUID();
+
+        <E extends Enum<E>> StringAssertions<T, N> assertInEnum(Class<E> enumValue);
+
+        <E extends Enum<E>> StringAssertions<T, N> assertInEnum(Class<E> enumValue, Function<E, String> enumValueToNameFn);
 
         static <T, N> StringAssertions<T, N> forValue(String value,
                                                       Supplier<String> fieldName,
@@ -864,6 +903,45 @@ public interface Valid<T> {
                             val -> pattern.matcher(val).matches()
                     );
                 }
+
+                @Override
+                public StringAssertions<T, N> assertValidUUID() {
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must be valid UUID",
+                            val -> val.length() == 36 && val.charAt(8) == '-' && val.charAt(13) == '-' && val.charAt(18) == '-' && val.charAt(23) == '-'
+                    );
+                }
+
+                @Override
+                public <E extends Enum<E>> StringAssertions<T, N> assertInEnum(Class<E> enumType) {
+                    return assertInEnum(enumType, Enum::name);
+                }
+
+                @Override
+                public <E extends Enum<E>> StringAssertions<T, N> assertInEnum(Class<E> enumType, Function<E, String> enumValueToNameFn) {
+                    Objects.requireNonNull(enumType);
+                    Objects.requireNonNull(enumValueToNameFn);
+                    return check(
+                            this,
+                            value,
+                            nullSpec,
+                            fieldName,
+                            "must be in list of allowed enum values",
+                            val -> {
+                                var enumConstants = enumType.getEnumConstants();
+                                for (var enumConstant : enumConstants) {
+                                    if (enumValueToNameFn.apply(enumConstant).equals(val)) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+                    );
+                }
             };
         }
     }
@@ -939,6 +1017,11 @@ public interface Valid<T> {
         }
 
         @Override
+        public Valid<T> switchIfInvalid(Supplier<Valid<T>> supplier) {
+            return supplier.get();
+        }
+
+        @Override
         public Optional<T> optional() {
             return Optional.empty();
         }
@@ -991,6 +1074,11 @@ public interface Valid<T> {
         @Override
         public T orElseThrow(Function<List<Violation>, ? extends Throwable> exceptionFn) {
             return value.get();
+        }
+
+        @Override
+        public Valid<T> switchIfInvalid(Supplier<Valid<T>> supplier) {
+            return this;
         }
 
         @Override
