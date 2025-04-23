@@ -17,10 +17,11 @@ public interface IndexedNullSpec<PARENT, ROOT, CURRENT> extends BaseNullSpec<ROO
       Function<@NotNull IndexedStringAssertions<CURRENT, TARGET, ROOT, CURRENT>,
           @NotNull IndexedStringAssertions<CURRENT, TARGET, ROOT, CURRENT>> action);
 
-  <TARGET extends Number & Comparable<TARGET>> IndexedAssertionsSpec<PARENT, ROOT, CURRENT> number(
+  <TARGET extends Number & Comparable<TARGET>>
+  IndexedAssertionsSpec<PARENT, ROOT, CURRENT> number(
       Function<@NotNull CURRENT, @Nullable TARGET> extract,
-      Function<@NotNull IndexedNumberAssertions<PARENT, TARGET, ROOT, CURRENT>,
-          @NotNull IndexedNumberAssertions<PARENT, TARGET, ROOT, CURRENT>> action);
+      Function<@NotNull IndexedNumberAssertions<Child<CURRENT, PARENT>, TARGET, ROOT, CURRENT>,
+          @NotNull IndexedNumberAssertions<Child<CURRENT, PARENT>, TARGET, ROOT, CURRENT>> action);
 
   <TARGET> IndexedAssertionsSpec<PARENT, ROOT, CURRENT> nested(
       Function<@NotNull CURRENT, @Nullable TARGET> extract,

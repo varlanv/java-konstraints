@@ -23,4 +23,9 @@ public interface AssertionsSpec<ROOT, CURRENT> extends BaseAssertionsSpec<ROOT, 
       Rules<ROOT> rules, Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn) {
     return null;
   }
+
+  abstract class Kek {
+
+    protected abstract void sd();
+  }
 }

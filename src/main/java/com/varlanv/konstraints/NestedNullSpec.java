@@ -14,8 +14,8 @@ public interface NestedNullSpec<PARENT, ROOT, CURRENT> extends BaseNullSpec<ROOT
 
   <TARGET extends CharSequence> NestedAssertionsSpec<PARENT, ROOT, CURRENT> string(
       Function<@NotNull CURRENT, @Nullable TARGET> extract,
-      Function<@NotNull StringAssertions<TARGET, ROOT, CURRENT>,
-          @NotNull StringAssertions<TARGET, ROOT, CURRENT>> action);
+      Function<@NotNull NestedStringAssertions<PARENT, TARGET, ROOT, CURRENT>,
+          @NotNull NestedStringAssertions<PARENT, TARGET, ROOT, CURRENT>> action);
 
   <TARGET extends Number & Comparable<TARGET>> NestedAssertionsSpec<PARENT, ROOT, CURRENT> number(
       Function<@NotNull CURRENT, @Nullable TARGET> extract,

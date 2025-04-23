@@ -1,3 +1,4 @@
+import com.varlanv.konstraints.Child;
 import com.varlanv.konstraints.Valid;
 
 import java.math.BigDecimal;
@@ -59,8 +60,7 @@ public class StaticMain {
                     .nonNull()
                     .number(NestedListVal2::val4, val4 -> val4
                         .assertCustom((a, b) -> a > 0)
-                        .assertCustom((a, b, c) -> c == 0)))
-            )
+                        .assertCustom((a, b, c) -> c == 0))))
             .field("strValue")
             .assertNotNull(Rec::strValue)
             .field("strValue")
@@ -79,17 +79,33 @@ public class StaticMain {
                     .field("val2")
                     .nonNull()
                     .string(Nested2::val2, val2 -> val2
+                        .assertCustom((a, b) -> {
+                          Child<Nested2, Child<Nested1, Rec>> self = b;
+                          Child<Nested1, Rec> parent1 = self.parent();
+                          Rec parent = parent1.parent();
+                          return true;
+                        })
                         .assertLength(15))
                     .field("kek")
                     .nonNull()
                     .custom(Nested2::val2, val2 -> val2
-                        .assertTrue(a -> a.length() == 1))
+                        .assertTrue((a, b) -> {
+                          Child<Nested1, Rec> parent = b.parent();
+                          Rec root = parent.parent();
+                          return a.length() == 1;
+                        }))
                     .field("nestedListVals")
                     .nonNull()
                     .iterable()
                     .nested(Nested2::nestedListVals, nestedListVals -> nestedListVals
                         .assertNotEmpty()
                         .eachItem(nestedListVal -> nestedListVal
+                            .field("val3")
+                            .nonNull()
+                            .string(NestedListVal1::val3, val3 -> val3
+                                .assertCustom((a, b, c) -> {
+                                  return true;
+                                }))
                             .field("nestedListVals2")
                             .nonNull()
                             .iterable()
@@ -99,11 +115,13 @@ public class StaticMain {
                                     .field("val4")
                                     .nonNull()
                                     .number(NestedListVal2::val4, val4 -> val4
-                                        .assertGte(5))))
-                        )
-                    )
-                )
-            )
+                                        .assertCustom((a, b, c) -> {
+                                          Integer self = a;
+                                          Child<NestedListVal2, NestedListVal1> parent1 = b.parent();
+                                          NestedListVal1 parent2 = parent1.parent();
+                                          return true;
+                                        })
+                                        .assertGte(5))))))))
         )
         .toValidationFunction();
 
