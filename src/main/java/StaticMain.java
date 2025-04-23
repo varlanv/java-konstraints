@@ -63,9 +63,9 @@ public class StaticMain {
                 )
                 .field("strValue")
                 .assertNotNull(Rec::strValue)
-                .field("strValue")
-                .nonNull()
-                .string(Rec::strValue, strVal -> strVal.assertLength(15))
+//                .field("strValue")
+//                .nonNull()
+//                .string(Rec::strValue, strVal -> strVal.assertLength(15))
 //                .field("longVal")
 //                .nullable()
 //                .number(Rec::longVal, longValSpec -> longValSpec

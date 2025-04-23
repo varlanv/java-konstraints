@@ -5,14 +5,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
-public interface CustomAssertions<TARGET, ROOT, CURRENT> extends BaseCustomAssertions<TARGET, ROOT, CURRENT> {
+public interface BaseCustomAssertions<TARGET, ROOT, CURRENT> {
 
-  @Override
-  CustomAssertions<TARGET, ROOT, CURRENT> assertTrue(
+  BaseCustomAssertions<TARGET, ROOT, CURRENT> assertTrue(
       Function<@NotNull CURRENT, @Nullable TARGET> extract, Function<@NotNull TARGET, @NotNull Boolean> action);
 
-  @Override
   Rules<ROOT> rules();
 
-  NullSpec<ROOT, CURRENT> parent();
+  BaseNullSpec<ROOT, CURRENT> parent();
 }

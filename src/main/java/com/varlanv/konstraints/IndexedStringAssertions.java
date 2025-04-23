@@ -7,7 +7,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 public interface IndexedStringAssertions<PARENT, TARGET extends CharSequence, ROOT, CURRENT>
-    extends StringAssertions<TARGET, ROOT, CURRENT> {
+    extends BaseStringAssertions<TARGET, ROOT, CURRENT> {
 
   IndexedStringAssertions<PARENT, TARGET, ROOT, CURRENT> assertCustom(
       BiPredicateIndexed<@NotNull TARGET, @NotNull PARENT> action);

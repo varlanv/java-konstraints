@@ -5,24 +5,20 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
-public interface IterableAssertionsSpec<PARENT, ROOT, CURRENT>  {
+public interface IterableAssertionsSpec<PARENT, ROOT, CURRENT> extends BaseAssertionsSpec<ROOT, CURRENT> {
 
+  @Override
   NestedFieldSpec<PARENT, ROOT, CURRENT> field(String fieldName);
 
+  @Override
   IterableAssertionsSpec<PARENT, ROOT, CURRENT> withRule(Rule<ROOT> rule);
 
+  @Override
   IterableAssertionsSpec<PARENT, ROOT, CURRENT> mergeRules(Rules<ROOT> rules);
 
+  @Override
   Rules<ROOT> rules();
 
+  @Override
   Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn();
-
-  PARENT parent();
-
-  static <PARENT, ROOT, CURRENT> IterableAssertionsSpec<PARENT, ROOT, CURRENT> of(
-      Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn,
-      Rules<ROOT> rules,
-      PARENT parent) {
-    return null;
-  }
 }

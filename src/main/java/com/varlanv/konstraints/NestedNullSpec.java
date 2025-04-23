@@ -5,7 +5,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
-public interface NestedNullSpec<PARENT, ROOT, CURRENT> {
+public interface NestedNullSpec<PARENT, ROOT, CURRENT> extends BaseNullSpec<ROOT, CURRENT> {
 
   <TARGET> NestedAssertionsSpec<PARENT, ROOT, CURRENT> custom(
       Function<@NotNull CURRENT, @Nullable TARGET> extract,
@@ -27,9 +27,12 @@ public interface NestedNullSpec<PARENT, ROOT, CURRENT> {
       Function<@NotNull NestedAssertionsSpec<Child<TARGET, PARENT>, CURRENT, TARGET>,
           @NotNull NestedAssertionsSpec<Child<TARGET, PARENT>, CURRENT, TARGET>> action);
 
-  NestedFieldSpec<ROOT, PARENT, CURRENT> parent();
+  @Override
+  NestedFieldSpec<PARENT, ROOT, CURRENT> parent();
 
+  @Override
   IterableSpec<CURRENT, ROOT, CURRENT> iterable();
 
+  @Override
   Boolean allowNull();
 }

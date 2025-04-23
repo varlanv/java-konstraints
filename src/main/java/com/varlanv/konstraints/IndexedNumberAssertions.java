@@ -5,7 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.function.Predicate;
 
 public interface IndexedNumberAssertions<PARENT, TARGET extends Number & Comparable<TARGET>, ROOT, CURRENT>
-    extends NumberAssertions<TARGET, ROOT, CURRENT> {
+    extends BaseNumberAssertions<TARGET, ROOT, CURRENT> {
 
   IndexedNumberAssertions<PARENT, TARGET, ROOT, CURRENT> assertCustom(BiPredicateIndexed<@NotNull TARGET, PARENT> action);
 
