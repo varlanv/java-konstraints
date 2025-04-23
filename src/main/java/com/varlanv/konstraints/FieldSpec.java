@@ -1,7 +1,5 @@
 package com.varlanv.konstraints;
 
-import org.jetbrains.annotations.NotNullByDefault;
-
 import java.util.function.Function;
 
 public interface FieldSpec<ROOT, CURRENT> {

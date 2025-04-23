@@ -1,7 +1,6 @@
 package com.varlanv.konstraints;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.NotNullByDefault;
 
 import java.util.function.Supplier;
 

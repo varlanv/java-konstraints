@@ -3,18 +3,13 @@ package com.varlanv.konstraints;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-final class Internals {
-
-  private Internals() {
-    throw new AssertionError("No instances for you!");
-  }
+interface Internals {
 
   static <T> Supplier<@NotNull T> onceSupplier(Supplier<@NotNull T> delegate) {
     Objects.requireNonNull(delegate);
