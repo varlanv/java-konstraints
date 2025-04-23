@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -138,15 +139,14 @@ public interface StaticValid<SUBJECT> {
   }
 
   static <SUBJECT> ValidationSpec<SUBJECT> validationSpec(
-      Function<AssertionsSpec<SUBJECT, SUBJECT>, AssertionsSpec<SUBJECT, ?>> specAction) {
+      Function<AssertionsSpec<SUBJECT, SUBJECT>, AssertionsSpec<SUBJECT, SUBJECT>> specAction) {
     return ValidationSpec.fromRules(
         specAction.apply(
-                AssertionsSpec.from(
-                    Rules.create(),
-                    Function.identity()
-                )
+            AssertionsSpec.from(
+                Rules.create(),
+                Function.identity()
             )
-            .rules()
+        ).rules()
     );
   }
 
@@ -162,22 +162,25 @@ public interface StaticValid<SUBJECT> {
     List<Rule<SUBJECT>> list();
 
     static <SUBJECT> Rules<SUBJECT> create() {
-      var rules = new ArrayList<Rule<SUBJECT>>();
-      var view = Collections.unmodifiableList(rules);
+      return create(List.of());
+    }
+
+    static <SUBJECT> Rules<SUBJECT> create(List<Rule<SUBJECT>> incomeRules) {
+      var rules = List.copyOf(incomeRules);
       return new Rules<>() {
 
         @Override
         public Rules<SUBJECT> add(Rule<SUBJECT> rule) {
-          rules.add(Objects.requireNonNull(rule));
-          return this;
+          return Rules.create(addToList(rules, rule));
         }
 
         @Override
         public Rules<SUBJECT> merge(Rules<SUBJECT> other) {
-          for (Rule<SUBJECT> subjectRule : other.list()) {
-            add(Objects.requireNonNull(subjectRule));
+          var otherRules = other.list();
+          if (otherRules.isEmpty()) {
+            return this;
           }
-          return this;
+          return Rules.create(mergeLists(rules, otherRules));
         }
 
         @Override
@@ -197,7 +200,7 @@ public interface StaticValid<SUBJECT> {
 
         @Override
         public List<Rule<SUBJECT>> list() {
-          return view;
+          return rules;
         }
       };
     }
@@ -253,68 +256,145 @@ public interface StaticValid<SUBJECT> {
   interface Rule<SUBJECT> extends Function<@NotNull SUBJECT, @NotNull Optional<Violation>> {
   }
 
-  interface AssertionsSpec<PREVIOUS, CURRENT> {
+  interface AssertionsSpec<ROOT, CURRENT> {
 
-    FieldSpec<PREVIOUS, CURRENT> field(String fieldName);
+    FieldSpec<ROOT, CURRENT> field(String fieldName);
 
-    AssertionsSpec<PREVIOUS, CURRENT> withRule(Rule<PREVIOUS> rule);
+    AssertionsSpec<ROOT, CURRENT> withRule(Rule<ROOT> rule);
 
-    Rules<PREVIOUS> rules();
+    AssertionsSpec<ROOT, CURRENT> mergeRules(Rules<ROOT> rules);
 
-    Function<@NotNull PREVIOUS, @Nullable CURRENT> currentNestFn();
+    Rules<ROOT> rules();
 
-    static <PREVIOUS, CURRENT> AssertionsSpec<PREVIOUS, CURRENT> from(
-        Rules<PREVIOUS> rules, Function<@NotNull PREVIOUS, @Nullable CURRENT> currentNestFn) {
+    Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn();
+
+    static <ROOT, CURRENT> AssertionsSpec<ROOT, CURRENT> from(
+        Rules<ROOT> rules, Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn) {
       return new AssertionsSpec<>() {
 
         @Override
-        public FieldSpec<PREVIOUS, CURRENT> field(String fieldName) {
+        public FieldSpec<ROOT, CURRENT> field(String fieldName) {
           return FieldSpec.of(fieldName, this);
         }
 
         @Override
-        public AssertionsSpec<PREVIOUS, CURRENT> withRule(Rule<PREVIOUS> rule) {
+        public AssertionsSpec<ROOT, CURRENT> withRule(Rule<ROOT> rule) {
           rules.add(rule);
           return this;
         }
 
         @Override
-        public Rules<PREVIOUS> rules() {
+        public AssertionsSpec<ROOT, CURRENT> mergeRules(Rules<ROOT> rules) {
+          return AssertionsSpec.from(
+              rules.merge(rules),
+              currentNestFn
+          );
+        }
+
+        @Override
+        public Rules<ROOT> rules() {
           return rules;
         }
 
         @Override
-        public Function<@NotNull PREVIOUS, @Nullable CURRENT> currentNestFn() {
+        public Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn() {
           return currentNestFn;
         }
       };
     }
   }
 
-  interface FieldSpec<PREVIOUS, CURRENT> {
+  interface NestedAssertionsSpec<PARENT, ROOT, CURRENT> {
 
-    <TARGET> AssertionsSpec<PREVIOUS, CURRENT> assertNotNull(Function<CURRENT, TARGET> extract);
+    NestedFieldSpec<PARENT, ROOT, CURRENT> field(String fieldName);
 
-    <TARGET> AssertionsSpec<PREVIOUS, CURRENT> assertNull(Function<CURRENT, TARGET> extract);
+    NestedAssertionsSpec<PARENT, ROOT, CURRENT> withRule(Rule<ROOT> rule);
 
-    NullSpec<PREVIOUS, CURRENT> nullable();
+    NestedAssertionsSpec<PARENT, ROOT, CURRENT> mergeRules(Rules<ROOT> rules);
 
-    NullSpec<PREVIOUS, CURRENT> nonNull();
+    Rules<ROOT> rules();
+
+    Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn();
+
+    PARENT parent();
+
+    static <PARENT, ROOT, CURRENT> NestedAssertionsSpec<PARENT, ROOT, CURRENT> of(
+        Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn,
+        Rules<ROOT> rules,
+        PARENT parent) {
+      return new NestedAssertionsSpec<>() {
+        @Override
+        public NestedFieldSpec<PARENT, ROOT, CURRENT> field(String fieldName) {
+          return null;
+        }
+
+        @Override
+        public NestedAssertionsSpec<PARENT, ROOT, CURRENT> withRule(Rule<ROOT> rule) {
+          return null;
+        }
+
+        @Override
+        public NestedAssertionsSpec<PARENT, ROOT, CURRENT> mergeRules(Rules<ROOT> rules) {
+          return null;
+        }
+
+        @Override
+        public Rules<ROOT> rules() {
+          return null;
+        }
+
+        @Override
+        public Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn() {
+          return null;
+        }
+
+        @Override
+        public PARENT parent() {
+          return parent;
+        }
+      };
+    }
+  }
+
+  interface NestedFieldSpec<PARENT, ROOT, CURRENT> {
+
+    <TARGET> NestedAssertionsSpec<PARENT, ROOT, CURRENT> assertNotNull(Function<CURRENT, TARGET> extract);
+
+    <TARGET> NestedAssertionsSpec<PARENT, ROOT, CURRENT> assertNull(Function<CURRENT, TARGET> extract);
+
+    NestedNullSpec<PARENT, ROOT, CURRENT> nonNull();
+
+    NestedNullSpec<PARENT, ROOT, CURRENT> nullable();
 
     String fieldName();
 
-    AssertionsSpec<PREVIOUS, CURRENT> parent();
+    NestedAssertionsSpec<PARENT, ROOT, CURRENT> parent();
+  }
 
-    static <PREVIOUS, CURRENT> FieldSpec<PREVIOUS, CURRENT> of(
-        String fieldName, AssertionsSpec<PREVIOUS, CURRENT> parent) {
+  interface FieldSpec<ROOT, CURRENT> {
+
+    <TARGET> AssertionsSpec<ROOT, CURRENT> assertNotNull(Function<CURRENT, TARGET> extract);
+
+    <TARGET> AssertionsSpec<ROOT, CURRENT> assertNull(Function<CURRENT, TARGET> extract);
+
+    NullSpec<ROOT, CURRENT> nonNull();
+
+    NullSpec<ROOT, CURRENT> nullable();
+
+    String fieldName();
+
+    AssertionsSpec<ROOT, CURRENT> parent();
+
+    static <ROOT, CURRENT> FieldSpec<ROOT, CURRENT> of(
+        String fieldName, AssertionsSpec<ROOT, CURRENT> parent) {
       return new FieldSpec<>() {
 
         @Override
-        public <TARGET> AssertionsSpec<PREVIOUS, CURRENT> assertNotNull(
+        public <TARGET> AssertionsSpec<ROOT, CURRENT> assertNotNull(
             Function<CURRENT, TARGET> extract) {
           return parent().withRule(
               t -> {
-                if (t == null) {
+                if (parent().currentNestFn().apply(t) == null) {
                   return Optional.of(Violation.of(fieldName(), "expected to be non-null"));
                 } else {
                   return Optional.empty();
@@ -323,11 +403,11 @@ public interface StaticValid<SUBJECT> {
         }
 
         @Override
-        public <TARGET> AssertionsSpec<PREVIOUS, CURRENT> assertNull(
+        public <TARGET> AssertionsSpec<ROOT, CURRENT> assertNull(
             Function<CURRENT, TARGET> extract) {
           return parent().withRule(
               t -> {
-                if (t != null) {
+                if (parent().currentNestFn().apply(t) != null) {
                   return Optional.of(Violation.of(fieldName(), "expected to be null"));
                 } else {
                   return Optional.empty();
@@ -336,12 +416,12 @@ public interface StaticValid<SUBJECT> {
         }
 
         @Override
-        public NullSpec<PREVIOUS, CURRENT> nullable() {
+        public NullSpec<ROOT, CURRENT> nullable() {
           return NullSpec.of(true, this);
         }
 
         @Override
-        public NullSpec<PREVIOUS, CURRENT> nonNull() {
+        public NullSpec<ROOT, CURRENT> nonNull() {
           return NullSpec.of(false, this);
         }
 
@@ -351,72 +431,148 @@ public interface StaticValid<SUBJECT> {
         }
 
         @Override
-        public AssertionsSpec<PREVIOUS, CURRENT> parent() {
+        public AssertionsSpec<ROOT, CURRENT> parent() {
           return parent;
         }
       };
     }
   }
 
-  interface NullSpec<PREVIOUS, CURRENT> {
+  interface NestedNullSpec<PARENT, ROOT, CURRENT> {
 
-    AssertionsSpec<PREVIOUS, CURRENT> string(
-        Function<@NotNull CURRENT, @Nullable String> extract,
-        Function<@NotNull StringAssertions<PREVIOUS, CURRENT>, ?> action);
-
-    <TARGET extends Comparable<TARGET>> AssertionsSpec<PREVIOUS, CURRENT> number(
+    <TARGET> NestedAssertionsSpec<PARENT, ROOT, CURRENT> custom(
         Function<@NotNull CURRENT, @Nullable TARGET> extract,
-        Function<@NotNull NumberAssertions<TARGET, PREVIOUS, CURRENT>, ?> action);
+        Function<@NotNull NestedCustomAssertions<TARGET, PARENT, ROOT, CURRENT>,
+            @NotNull NestedCustomAssertions<TARGET, PARENT, ROOT, CURRENT>> action);
 
-    <TARGET> AssertionsSpec<PREVIOUS, CURRENT> nested(Function<@NotNull CURRENT, @Nullable TARGET> extract,
-                                                      Function<@NotNull AssertionsSpec<PREVIOUS, TARGET>, ?> action);
+    NestedAssertionsSpec<PARENT, ROOT, CURRENT> string(
+        Function<@NotNull CURRENT, @Nullable String> extract,
+        Function<@NotNull StringAssertions<ROOT, CURRENT>, @NotNull StringAssertions<ROOT, CURRENT>> action);
 
-    FieldSpec<PREVIOUS, CURRENT> parent();
+    <TARGET extends Number & Comparable<TARGET>> NestedAssertionsSpec<PARENT, ROOT, CURRENT> number(
+        Function<@NotNull CURRENT, @Nullable TARGET> extract,
+        Function<@NotNull NumberAssertions<TARGET, ROOT, CURRENT>,
+            @NotNull NumberAssertions<TARGET, ROOT, CURRENT>> action);
 
-    IterableSpec<PREVIOUS, CURRENT> iterable();
+    <TARGET> NestedAssertionsSpec<PARENT, ROOT, CURRENT> nested(
+        Function<@NotNull CURRENT, @Nullable TARGET> extract,
+        Function<@NotNull NestedAssertionsSpec<Child<TARGET, PARENT>, CURRENT, TARGET>,
+            @NotNull NestedAssertionsSpec<Child<TARGET, PARENT>, CURRENT, TARGET>> action);
+
+    NestedFieldSpec<ROOT, PARENT, CURRENT> parent();
+
+    IterableSpec<ROOT, CURRENT> iterable();
+
+    Boolean allowNull();
+  }
+
+  interface NullSpec<ROOT, CURRENT> {
+
+    <TARGET> AssertionsSpec<ROOT, CURRENT> custom(Function<@NotNull CURRENT, @Nullable TARGET> extract,
+                                                  Function<@NotNull CustomAssertions<TARGET, ROOT, CURRENT>,
+                                                      @NotNull CustomAssertions<TARGET, ROOT, CURRENT>> action);
+
+    AssertionsSpec<ROOT, CURRENT> string(
+        Function<@NotNull CURRENT, @Nullable String> extract,
+        Function<@NotNull StringAssertions<ROOT, CURRENT>, @NotNull StringAssertions<ROOT, CURRENT>> action);
+
+    <TARGET extends Number & Comparable<TARGET>> AssertionsSpec<ROOT, CURRENT> number(
+        Function<@NotNull CURRENT, @Nullable TARGET> extract,
+        Function<@NotNull NumberAssertions<TARGET, ROOT, CURRENT>,
+            @NotNull NumberAssertions<TARGET, ROOT, CURRENT>> action);
+
+    <TARGET> AssertionsSpec<ROOT, CURRENT> nested(
+        Function<@NotNull CURRENT, @Nullable TARGET> extract,
+        Function<@NotNull NestedAssertionsSpec<Child<TARGET, CURRENT>, CURRENT, TARGET>,
+            @NotNull NestedAssertionsSpec<Child<TARGET, CURRENT>, CURRENT, TARGET>> action);
+
+    FieldSpec<ROOT, CURRENT> parent();
+
+    IterableSpec<ROOT, CURRENT> iterable();
 
     Boolean allowNull();
 
-    static <PREVIOUS, CURRENT> NullSpec<PREVIOUS, CURRENT> of(Boolean allowNull, FieldSpec<PREVIOUS, CURRENT> parent) {
+    static <ROOT, CURRENT> NullSpec<ROOT, CURRENT> of(Boolean allowNull, FieldSpec<ROOT, CURRENT> parent) {
       return new NullSpec<>() {
-        @Override
-        public AssertionsSpec<PREVIOUS, CURRENT> string(
-            Function<@NotNull CURRENT, @Nullable String> extract,
-            Function<@NotNull StringAssertions<PREVIOUS, CURRENT>, ?> action) {
-          StringAssertions.of(extract, action, this);
-          return parent().parent();
-        }
 
         @Override
-        public <TARGET extends Comparable<TARGET>> AssertionsSpec<PREVIOUS, CURRENT> number(
+        public <TARGET> AssertionsSpec<ROOT, CURRENT> custom(
             Function<@NotNull CURRENT, @Nullable TARGET> extract,
-            Function<@NotNull NumberAssertions<TARGET, PREVIOUS, CURRENT>, ?> action) {
-          NumberAssertions.of(extract, action, this);
-          return parent().parent();
-        }
-
-        @Override
-        public <TARGET> AssertionsSpec<PREVIOUS, CURRENT> nested(
-            Function<@NotNull CURRENT, @Nullable TARGET> extract,
-            Function<@NotNull AssertionsSpec<PREVIOUS, TARGET>, ?> action) {
-          var parent = parent().parent();
-          AssertionsSpec.<PREVIOUS, TARGET>from(
-              parent.rules(),
-              t -> {
-                CURRENT apply = parent().parent().currentNestFn().apply(t);
-                return apply == null ? null : extract.apply(apply);
-              }
+            Function<@NotNull CustomAssertions<TARGET, ROOT, CURRENT>,
+                @NotNull CustomAssertions<TARGET, ROOT, CURRENT>> action) {
+          return parent().parent().mergeRules(
+              action.apply(
+                  CustomAssertions.of(
+                      extract,
+                      Rules.create(),
+                      this
+                  )
+              ).rules()
           );
+        }
+
+        @Override
+        public AssertionsSpec<ROOT, CURRENT> string(
+            Function<@NotNull CURRENT, @Nullable String> extract,
+            Function<@NotNull StringAssertions<ROOT, CURRENT>, StringAssertions<ROOT, CURRENT>> action) {
+          return parent().parent().mergeRules(
+              action.apply(
+                  StringAssertions.of(
+                      extract,
+                      Rules.create(),
+                      this
+                  )
+              ).rules()
+          );
+        }
+
+        @Override
+        public <TARGET extends Number & Comparable<TARGET>> AssertionsSpec<ROOT, CURRENT> number(
+            Function<@NotNull CURRENT, @Nullable TARGET> extract,
+            Function<@NotNull NumberAssertions<TARGET, ROOT, CURRENT>, @NotNull NumberAssertions<TARGET, ROOT, CURRENT>> action) {
+          return parent().parent().mergeRules(
+              action.apply(
+                  NumberAssertions.of(
+                      extract,
+                      Rules.create(),
+                      this
+                  )
+              ).rules()
+          );
+        }
+
+        @Override
+        public <TARGET> AssertionsSpec<ROOT, CURRENT> nested(
+            Function<@NotNull CURRENT, @Nullable TARGET> extract,
+            Function<@NotNull NestedAssertionsSpec<Child<TARGET, CURRENT>, CURRENT, TARGET>,
+                @NotNull NestedAssertionsSpec<Child<TARGET, CURRENT>, CURRENT, TARGET>> action) {
+          var parent = parent().parent();
+          var rules = NestedAssertionsSpec.of(
+              extract,
+              Rules.create(),
+              parent
+          ).rules();
+          return parent.mergeRules(
+              Rules.create(
+                  rules.list().stream()
+                      .map(rule -> {
+                        return (Rule<ROOT>) t -> {
+                          CURRENT current = parent().parent().currentNestFn().apply(t);
+                          return rule.apply(current);
+                        };
+                      })
+                      .toList()
+              )
+          );
+        }
+
+        @Override
+        public FieldSpec<ROOT, CURRENT> parent() {
           return parent;
         }
 
         @Override
-        public FieldSpec<PREVIOUS, CURRENT> parent() {
-          return parent;
-        }
-
-        @Override
-        public IterableSpec<PREVIOUS, CURRENT> iterable() {
+        public IterableSpec<ROOT, CURRENT> iterable() {
           return IterableSpec.of(this);
         }
 
@@ -428,206 +584,321 @@ public interface StaticValid<SUBJECT> {
     }
   }
 
-  interface IterableSpec<PREVIOUS, CURRENT> {
+  interface CustomAssertions<TARGET, ROOT, CURRENT> {
+
+    CustomAssertions<TARGET, ROOT, CURRENT> assertTrue(
+        Function<@NotNull CURRENT, @Nullable TARGET> extract, Function<@NotNull TARGET, @NotNull Boolean> action);
+
+    Rules<ROOT> rules();
+
+    NullSpec<ROOT, CURRENT> parent();
+
+    static <TARGET, ROOT, CURRENT> CustomAssertions<TARGET, ROOT, CURRENT> of(Function<@NotNull CURRENT, @Nullable TARGET> extract,
+                                                                              Rules<ROOT> rules,
+                                                                              NullSpec<ROOT, CURRENT> parent) {
+      return new CustomAssertions<>() {
+
+        @Override
+        public CustomAssertions<TARGET, ROOT, CURRENT> assertTrue(
+            Function<@NotNull CURRENT, @Nullable TARGET> extract, Function<@NotNull TARGET, @NotNull Boolean> action) {
+          return CustomAssertions.of(
+              extract,
+              rules.add(t -> {
+                CURRENT current = parent().parent().parent().currentNestFn().apply(t);
+                TARGET target = extract.apply(current);
+                if (action.apply(target)) {
+                  return Optional.of(Violation.of("Fail"));
+                } else {
+                  return Optional.empty();
+                }
+              }),
+              parent
+          );
+        }
+
+        @Override
+        public Rules<ROOT> rules() {
+          return rules;
+        }
+
+        @Override
+        public NullSpec<ROOT, CURRENT> parent() {
+          return parent;
+        }
+      };
+    }
+  }
+
+  interface NestedCustomAssertions<TARGET, PARENT, ROOT, CURRENT> {
+
+    NestedCustomAssertions<TARGET, PARENT, ROOT, CURRENT> assertTrue(
+        Function<@NotNull TARGET, @NotNull Boolean> action);
+
+    NestedCustomAssertions<TARGET, PARENT, ROOT, CURRENT> assertTrue(
+        BiFunction<@NotNull TARGET, @NotNull PARENT, @NotNull Boolean> action);
+
+    Rules<ROOT> rules();
+
+    NullSpec<ROOT, CURRENT> parent();
+
+    static <TARGET, PARENT, ROOT, CURRENT> NestedCustomAssertions<TARGET, PARENT, ROOT, CURRENT> of(
+        Function<@NotNull CURRENT, @Nullable TARGET> extract,
+        Rules<ROOT> rules,
+        Supplier<PARENT> parentSupplier,
+        NullSpec<ROOT, CURRENT> parent) {
+      return new NestedCustomAssertions<>() {
+
+        @Override
+        public NestedCustomAssertions<TARGET, PARENT, ROOT, CURRENT> assertTrue(Function<@NotNull TARGET, @NotNull Boolean> action) {
+          return assertTrue((a, b) -> action.apply(a));
+        }
+
+        @Override
+        public NestedCustomAssertions<TARGET, PARENT, ROOT, CURRENT> assertTrue(BiFunction<@NotNull TARGET, @NotNull PARENT, @NotNull Boolean> action) {
+          return NestedCustomAssertions.of(
+              extract,
+              rules.add(t -> {
+                CURRENT current = parent().parent().parent().currentNestFn().apply(t);
+                TARGET target = extract.apply(current);
+                if (action.apply(target, parentSupplier.get())) {
+                  return Optional.of(Violation.of("Fail"));
+                } else {
+                  return Optional.empty();
+                }
+              }),
+              parentSupplier,
+              parent
+          );
+        }
+
+        @Override
+        public Rules<ROOT> rules() {
+          return rules;
+        }
+
+        @Override
+        public NullSpec<ROOT, CURRENT> parent() {
+          return parent;
+        }
+      };
+    }
+  }
+
+  interface IterableSpec<ROOT, CURRENT> {
 
     <ITEM extends CharSequence, ITEMS extends Iterable<ITEM>>
-    IterableAssertions<StringAssertions<PREVIOUS, CURRENT>, ITEM, ITEMS, PREVIOUS, CURRENT> strings(
+    IterableAssertions<StringAssertions<ROOT, CURRENT>, ITEM, ITEMS, ROOT, CURRENT> strings(
         Function<@NotNull CURRENT, @Nullable ITEMS> extract);
 
     <ITEM extends Comparable<ITEM>, ITEMS extends Iterable<ITEM>>
-    IterableAssertions<NumberAssertions<ITEM, PREVIOUS, CURRENT>, ITEM, ITEMS, PREVIOUS, CURRENT> numbers(
+    IterableAssertions<NumberAssertions<ITEM, ROOT, CURRENT>, ITEM, ITEMS, ROOT, CURRENT> numbers(
         Function<@NotNull CURRENT, @Nullable ITEMS> extract
     );
 
     <ITEM, ITEMS extends Iterable<ITEM>>
-    IterableAssertions<AssertionsSpec<PREVIOUS, ITEM>, ITEM, ITEMS, PREVIOUS, CURRENT> nested(
+    IterableAssertions<AssertionsSpec<ROOT, ITEM>, ITEM, ITEMS, ROOT, CURRENT> nested(
         Function<@NotNull CURRENT, @Nullable ITEMS> extract);
 
-    NullSpec<PREVIOUS, CURRENT> parent();
+    NullSpec<ROOT, CURRENT> parent();
 
-    static <PREVIOUS, CURRENT> IterableSpec<PREVIOUS, CURRENT> of(NullSpec<PREVIOUS, CURRENT> nullSpec) {
+    static <ROOT, CURRENT> IterableSpec<ROOT, CURRENT> of(NullSpec<ROOT, CURRENT> nullSpec) {
       return new IterableSpec<>() {
         @Override
         public <ITEM extends CharSequence, ITEMS extends Iterable<ITEM>>
-        IterableAssertions<StringAssertions<PREVIOUS, CURRENT>, ITEM, ITEMS, PREVIOUS, CURRENT> strings(
+        IterableAssertions<StringAssertions<ROOT, CURRENT>, ITEM, ITEMS, ROOT, CURRENT> strings(
             Function<@NotNull CURRENT, @Nullable ITEMS> extract) {
           return IterableAssertions.of(extract, this);
         }
 
         @Override
         public <ITEM extends Comparable<ITEM>, ITEMS extends Iterable<ITEM>>
-        IterableAssertions<NumberAssertions<ITEM, PREVIOUS, CURRENT>, ITEM, ITEMS, PREVIOUS, CURRENT> numbers(
+        IterableAssertions<NumberAssertions<ITEM, ROOT, CURRENT>, ITEM, ITEMS, ROOT, CURRENT> numbers(
             Function<@NotNull CURRENT, @Nullable ITEMS> extract) {
           return IterableAssertions.of(extract, this);
         }
 
         @Override
         public <ITEM, ITEMS extends Iterable<ITEM>>
-        IterableAssertions<AssertionsSpec<PREVIOUS, ITEM>, ITEM, ITEMS, PREVIOUS, CURRENT> nested(
+        IterableAssertions<AssertionsSpec<ROOT, ITEM>, ITEM, ITEMS, ROOT, CURRENT> nested(
             Function<@NotNull CURRENT, @Nullable ITEMS> extract) {
           return IterableAssertions.of(extract, this);
         }
 
         @Override
-        public NullSpec<PREVIOUS, CURRENT> parent() {
+        public NullSpec<ROOT, CURRENT> parent() {
           return nullSpec;
         }
       };
     }
   }
 
-  interface IterableAssertions<ASSERTIONS, ITEM, ITEMS extends Iterable<ITEM>, PREVIOUS, CURRENT> {
+  interface IterableAssertions<ASSERTIONS, ITEM, ITEMS extends Iterable<ITEM>, ROOT, CURRENT> {
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertSize(Integer size);
+    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertSize(Integer size);
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertMinSize(Integer minSize);
+    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertMinSize(Integer minSize);
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertMaxSize(Integer maxSize);
+    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertMaxSize(Integer maxSize);
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertSizeRange(Integer minSize, Integer maxSize);
+    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertSizeRange(Integer minSize, Integer maxSize);
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertNotEmpty();
+    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertNotEmpty();
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertEmpty();
+    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertEmpty();
 
-    AssertionsSpec<PREVIOUS, CURRENT> eachItem(Function<ASSERTIONS, ?> action);
+    AssertionsSpec<ROOT, CURRENT> eachItem(Function<ASSERTIONS, ?> action);
 
     static <
         ASSERTIONS,
         ITEM,
         ITEMS extends Iterable<ITEM>,
-        PREVIOUS,
-        CURRENT> IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> of(
-        Function<@NotNull CURRENT, @Nullable ITEMS> extract, IterableSpec<PREVIOUS, CURRENT> parent) {
+        ROOT,
+        CURRENT> IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> of(
+        Function<@NotNull CURRENT, @Nullable ITEMS> extract, IterableSpec<ROOT, CURRENT> parent) {
       return new IterableAssertions<>() {
         @Override
-        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertSize(Integer size) {
+        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertSize(Integer size) {
           return this;
         }
 
         @Override
-        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertMinSize(Integer minSize) {
+        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertMinSize(Integer minSize) {
           return this;
         }
 
         @Override
-        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertMaxSize(Integer maxSize) {
+        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertMaxSize(Integer maxSize) {
           return this;
         }
 
         @Override
-        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertSizeRange(Integer minSize, Integer maxSize) {
+        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertSizeRange(Integer minSize, Integer maxSize) {
           return this;
         }
 
         @Override
-        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertNotEmpty() {
+        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertNotEmpty() {
           return this;
         }
 
         @Override
-        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, PREVIOUS, CURRENT> assertEmpty() {
+        public IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertEmpty() {
           return this;
         }
 
         @Override
-        public AssertionsSpec<PREVIOUS, CURRENT> eachItem(Function<ASSERTIONS, ?> action) {
+        public AssertionsSpec<ROOT, CURRENT> eachItem(Function<ASSERTIONS, ?> action) {
           return parent.parent().parent().parent();
         }
       };
     }
   }
 
-  interface NumberAssertions<TARGET extends Comparable<TARGET>, PREVIOUS, CURRENT> {
+  interface NumberAssertions<TARGET extends Comparable<TARGET>, ROOT, CURRENT> {
 
+    Rules<ROOT> rules();
 
-    NumberAssertions<TARGET, PREVIOUS, CURRENT> isGte(TARGET target);
+    NumberAssertions<TARGET, ROOT, CURRENT> isGte(TARGET target);
 
-    NumberAssertions<TARGET, PREVIOUS, CURRENT> isLte(TARGET target);
+    NumberAssertions<TARGET, ROOT, CURRENT> isLte(TARGET target);
 
-    NumberAssertions<TARGET, PREVIOUS, CURRENT> isInRange(TARGET minTarget, TARGET maxTarget);
+    NumberAssertions<TARGET, ROOT, CURRENT> isInRange(TARGET minTarget, TARGET maxTarget);
 
-    static <TARGET extends Comparable<TARGET>, PREVIOUS, CURRENT> NumberAssertions<TARGET, PREVIOUS, CURRENT> of(
+    static <TARGET extends Number & Comparable<TARGET>, ROOT, CURRENT> NumberAssertions<TARGET, ROOT, CURRENT> of(
         Function<@NotNull CURRENT, @Nullable TARGET> extract,
-        Function<@NotNull NumberAssertions<TARGET, PREVIOUS, CURRENT>, ?> action,
-        NullSpec<PREVIOUS, CURRENT> parent) {
+        Rules<ROOT> rules,
+        NullSpec<ROOT, CURRENT> parent) {
       return new NumberAssertions<>() {
 
         @Override
-        public NumberAssertions<TARGET, PREVIOUS, CURRENT> isGte(TARGET target) {
+        public Rules<ROOT> rules() {
+          return rules;
+        }
+
+        @Override
+        public NumberAssertions<TARGET, ROOT, CURRENT> isGte(TARGET target) {
           return this;
         }
 
         @Override
-        public NumberAssertions<TARGET, PREVIOUS, CURRENT> isLte(TARGET target) {
+        public NumberAssertions<TARGET, ROOT, CURRENT> isLte(TARGET target) {
           return this;
         }
 
         @Override
-        public NumberAssertions<TARGET, PREVIOUS, CURRENT> isInRange(
+        public NumberAssertions<TARGET, ROOT, CURRENT> isInRange(
             TARGET minTarget, TARGET maxTarget) {
           return this;
         }
       };
     }
-
   }
 
-  interface StringAssertions<PREVIOUS, CURRENT> {
+  interface StringAssertions<ROOT, CURRENT> {
 
-    StringAssertions<PREVIOUS, CURRENT> isEmpty();
+    Rules<ROOT> rules();
 
-    StringAssertions<PREVIOUS, CURRENT> isNotBlank();
+    StringAssertions<ROOT, CURRENT> isEmpty();
 
-    StringAssertions<PREVIOUS, CURRENT> assertLength(Integer length);
+    StringAssertions<ROOT, CURRENT> isNotBlank();
 
-    StringAssertions<PREVIOUS, CURRENT> hasMinLength(Integer minLength);
+    StringAssertions<ROOT, CURRENT> assertLength(Integer length);
 
-    StringAssertions<PREVIOUS, CURRENT> hasMaxLength(Integer maxLength);
+    StringAssertions<ROOT, CURRENT> hasMinLength(Integer minLength);
 
-    StringAssertions<PREVIOUS, CURRENT> hasLengthRange(Integer minLength, Integer maxLength);
+    StringAssertions<ROOT, CURRENT> hasMaxLength(Integer maxLength);
 
-    StringAssertions<PREVIOUS, CURRENT> matches(Pattern pattern);
+    StringAssertions<ROOT, CURRENT> hasLengthRange(Integer minLength, Integer maxLength);
 
-    static <PREVIOUS, CURRENT> StringAssertions<PREVIOUS, CURRENT> of(
-        Function<@NotNull CURRENT, String> extract,
-        Function<@NotNull StringAssertions<PREVIOUS, CURRENT>, ?> action,
-        NullSpec<PREVIOUS, CURRENT> parent) {
+    StringAssertions<ROOT, CURRENT> matches(Pattern pattern);
+
+    static <ROOT, CURRENT> StringAssertions<ROOT, CURRENT> of(
+        Function<@NotNull CURRENT, @Nullable String> extract,
+        Rules<ROOT> rules,
+        NullSpec<ROOT, CURRENT> parent) {
       return new StringAssertions<>() {
 
         @Override
-        public StringAssertions<PREVIOUS, CURRENT> isEmpty() {
+        public Rules<ROOT> rules() {
+          return rules;
+        }
+
+        @Override
+        public StringAssertions<ROOT, CURRENT> isEmpty() {
+          return StringAssertions.of(
+              extract,
+              rules.add(t -> Optional.empty()),
+              parent
+          );
+        }
+
+        @Override
+        public StringAssertions<ROOT, CURRENT> isNotBlank() {
           return this;
         }
 
         @Override
-        public StringAssertions<PREVIOUS, CURRENT> isNotBlank() {
+        public StringAssertions<ROOT, CURRENT> assertLength(Integer length) {
           return this;
         }
 
         @Override
-        public StringAssertions<PREVIOUS, CURRENT> assertLength(Integer length) {
+        public StringAssertions<ROOT, CURRENT> hasMinLength(Integer minLength) {
           return this;
         }
 
         @Override
-        public StringAssertions<PREVIOUS, CURRENT> hasMinLength(Integer minLength) {
+        public StringAssertions<ROOT, CURRENT> hasMaxLength(Integer maxLength) {
           return this;
         }
 
         @Override
-        public StringAssertions<PREVIOUS, CURRENT> hasMaxLength(Integer maxLength) {
+        public StringAssertions<ROOT, CURRENT> hasLengthRange(Integer minLength, Integer maxLength) {
           return this;
         }
 
         @Override
-        public StringAssertions<PREVIOUS, CURRENT> hasLengthRange(
-            Integer minLength, Integer maxLength) {
-          return this;
-        }
-
-        @Override
-        public StringAssertions<PREVIOUS, CURRENT> matches(Pattern pattern) {
+        public StringAssertions<ROOT, CURRENT> matches(Pattern pattern) {
           return this;
         }
       };
@@ -685,6 +956,55 @@ public interface StaticValid<SUBJECT> {
     }
   }
 
+  interface Child<SELF, PARENT> {
+
+    SELF value();
+
+    PARENT parent();
+
+    static <SELF, PARENT> Child<SELF, PARENT> of(SELF self, PARENT parent) {
+      return new Child<>() {
+        @Override
+        public SELF value() {
+          return self;
+        }
+
+        @Override
+        public PARENT parent() {
+          return parent;
+        }
+      };
+    }
+
+    static <SELF, PARENT> Child<SELF, PARENT> lazyParent(SELF self, Supplier<@NotNull PARENT> parent) {
+      return new Child<>() {
+        @Override
+        public SELF value() {
+          return self;
+        }
+
+        @Override
+        public PARENT parent() {
+          return parent.get();
+        }
+      };
+    }
+
+    static <SELF, PARENT> Child<SELF, PARENT> lazy(Supplier<SELF> self, Supplier<@NotNull PARENT> parent) {
+      return new Child<>() {
+        @Override
+        public SELF value() {
+          return self.get();
+        }
+
+        @Override
+        public PARENT parent() {
+          return parent.get();
+        }
+      };
+    }
+  }
+
   private static <IN, OUT> Function<@NotNull IN, @NotNull Optional<OUT>> wrapOptional(
       Function<@NotNull IN, @Nullable OUT> fn) {
     return t -> Optional.ofNullable(fn.apply(t));
@@ -693,5 +1013,27 @@ public interface StaticValid<SUBJECT> {
   @SuppressWarnings("unchecked")
   private static <T extends Throwable> T hide(Throwable t) throws T {
     throw (T) t;
+  }
+
+  private static <T> List<T> mergeLists(List<T> left, List<T> right) {
+    if (left.isEmpty()) {
+      return right;
+    } else if (right.isEmpty()) {
+      return left;
+    }
+    var resultArray = new Object[left.size() + right.size()];
+    for (var idx = 0; idx < left.size(); idx++) {
+      resultArray[idx] = Objects.requireNonNull(left.get(idx));
+    }
+    for (var idx = 0; idx < right.size(); idx++) {
+      resultArray[idx + left.size()] = Objects.requireNonNull(right.get(idx));
+    }
+    @SuppressWarnings("unchecked")
+    T[] result = (T[]) resultArray;
+    return List.of(result);
+  }
+
+  private static <T> List<T> addToList(List<T> left, T right) {
+    return mergeLists(left, List.of(right));
   }
 }

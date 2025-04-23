@@ -30,6 +30,10 @@ public class StaticMain {
     var fn = StaticValid.<Rec>validationSpec(rec -> rec
             .field("strValue")
             .assertNotNull(Rec::strValue)
+            .field("longVal")
+            .nullable()
+            .number(Rec::longVal, longValSpec -> longValSpec
+                .isGte(1L))
             .field("nested1")
             .nullable()
             .nested(Rec::nested1, nested1 -> nested1
@@ -40,13 +44,15 @@ public class StaticMain {
                     .nonNull()
                     .string(Nested2::val2, val2 -> val2
                         .assertLength(15))
+                    .field("kek")
+                    .nonNull()
+                    .custom(Nested2::val2, val2 -> val2
+                        .assertTrue(a -> a.length() == 1))
                     .field("nestedListVals")
                     .nonNull()
                     .iterable()
-                    .strings(Nested2::products)
-                    .assertMaxSize(5)
-                    .eachItem(assertions -> assertions
-                        .assertLength(1))
+                    .nested(Nested2::nestedListVals, nestedListVals -> nestedListVals
+                        .assertMaxSize(1))
                 )
             )
         )
