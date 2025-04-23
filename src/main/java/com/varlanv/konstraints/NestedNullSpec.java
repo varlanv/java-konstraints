@@ -25,7 +25,7 @@ public interface NestedNullSpec<PARENT, ROOT, CURRENT> extends BaseNullSpec<ROOT
   <TARGET> NestedAssertionsSpec<PARENT, ROOT, CURRENT> nested(
       Function<@NotNull CURRENT, @Nullable TARGET> extract,
       Function<@NotNull NestedAssertionsSpec<Child<TARGET, PARENT>, CURRENT, TARGET>,
-          @NotNull NestedAssertionsSpec<Child<TARGET, PARENT>, CURRENT, TARGET>> action);
+          @NotNull BaseAssertionsSpec<?, ?>> action);
 
   @Override
   NestedFieldSpec<PARENT, ROOT, CURRENT> parent();

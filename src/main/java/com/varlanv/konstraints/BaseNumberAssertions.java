@@ -4,7 +4,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Predicate;
 
-public interface BaseNumberAssertions<TARGET extends Comparable<TARGET>, ROOT, CURRENT> {
+public interface BaseNumberAssertions<TARGET extends Comparable<TARGET>, ROOT, CURRENT>
+    extends BaseAssertionsSpec<ROOT, CURRENT> {
 
   Rules<ROOT> rules();
 

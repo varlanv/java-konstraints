@@ -1,3 +1,4 @@
+import com.varlanv.konstraints.IterableAssertions;
 import com.varlanv.konstraints.Valid;
 
 import java.math.BigDecimal;
@@ -35,61 +36,61 @@ public class StaticMain {
 
   private static void tst() {
     var fn = Valid.<Rec>validationSpec(rec -> rec
-                .field("stringList")
-                .nonNull()
-                .iterable()
-                .strings(Rec::stringList, stringList -> stringList
-                    .assertNotEmpty()
-                    .eachItem(item -> item
-                        .assertCustom((a, b, c) -> c == 1)))
-                .field("bigDecimalList")
-                .nonNull()
-                .iterable()
-                .numbers(Rec::bigDecimalList, bigDecimalList -> bigDecimalList
-                    .assertNotEmpty()
-                    .eachItem(item -> item
+            .field("stringList")
+            .nonNull()
+            .iterable()
+            .strings(Rec::stringList, stringList -> stringList
+                .assertNotEmpty()
+                .eachItem(item -> item
+                    .assertCustom((a, b, c) -> c == 1)))
+            .field("bigDecimalList")
+            .nonNull()
+            .iterable()
+            .numbers(Rec::bigDecimalList, bigDecimalList -> bigDecimalList
+                .assertNotEmpty()
+                .eachItem(item -> item
+                    .assertCustom((a, b, c) -> c == 0)))
+            .field("nested1List")
+            .nonNull()
+            .iterable()
+            .nested(Rec::nested1List, list -> list
+                .assertNotEmpty()
+                .eachItem(item -> item
+                    .field("val4")
+                    .nonNull()
+                    .number(NestedListVal2::val4, val4 -> val4
+                        .assertCustom((a, b) -> a > 0)
                         .assertCustom((a, b, c) -> c == 0)))
-                .field("nested1List")
+            )
+            .field("strValue")
+            .assertNotNull(Rec::strValue)
+            .field("strValue")
+            .nonNull()
+            .string(Rec::strValue, strVal -> strVal.assertLength(15))
+            .field("longVal")
+            .nullable()
+            .number(Rec::longVal, longValSpec -> longValSpec
+                .assertGte(1L))
+            .field("nested1")
+            .nullable()
+            .nested(Rec::nested1, nested1 -> nested1
+                .field("nested2")
                 .nonNull()
-                .iterable()
-                .nested(Rec::nested1List, list -> list
-                    .assertNotEmpty()
-                    .eachItem(item -> item
-                        .field("val4")
-                        .nonNull()
-                        .number(NestedListVal2::val4, val4 -> val4
-                            .assertCustom((a, b) -> a > 0)
-                            .assertCustom((a, b, c) -> c == 0)))
+                .nested(Nested1::nested2, nested2 -> nested2
+                    .field("val2")
+                    .nonNull()
+                    .string(Nested2::val2, val2 -> val2
+                        .assertLength(15))
+                    .field("kek")
+                    .nonNull()
+                    .custom(Nested2::val2, val2 -> val2
+                        .assertTrue(a -> a.length() == 1))
+                    .field("nestedListVals")
+                    .nonNull()
+                    .iterable()
+                    .nested(Nested2::nestedListVals, IterableAssertions::assertEmpty)
                 )
-                .field("strValue")
-                .assertNotNull(Rec::strValue)
-                .field("strValue")
-                .nonNull()
-                .string(Rec::strValue, strVal -> strVal.assertLength(15))
-                .field("longVal")
-                .nullable()
-                .number(Rec::longVal, longValSpec -> longValSpec
-                    .assertGte(1L))
-                .field("nested1")
-                .nullable()
-                .nested(Rec::nested1, nested1 -> nested1
-                        .field("nested2")
-                        .nonNull()
-                        .nested(Nested1::nested2, nested2 -> nested2
-//                    .field("val2")
-//                    .nonNull()
-//                    .string(Nested2::val2, val2 -> val2
-//                        .assertLength(15))
-//                    .field("kek")
-//                    .nonNull()
-//                    .custom(Nested2::val2, val2 -> val2
-//                        .assertTrue(a -> a.length() == 1))
-//                    .field("nestedListVals")
-//                    .nonNull()
-//                    .iterable()
-//                    .nested(Nested2::nestedListVals, nestedListVals -> nestedListVals)
-                        )
-                )
+            )
         )
         .toValidationFunction();
 

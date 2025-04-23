@@ -6,9 +6,8 @@ import org.jetbrains.annotations.Range;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-public interface BaseStringAssertions<TARGET extends CharSequence, ROOT, CURRENT> {
-
-  Rules<ROOT> rules();
+public interface BaseStringAssertions<TARGET extends CharSequence, ROOT, CURRENT>
+    extends BaseAssertionsSpec<ROOT, CURRENT> {
 
   BaseStringAssertions<TARGET, ROOT, CURRENT> assertCustom(Predicate<@NotNull TARGET> action);
 

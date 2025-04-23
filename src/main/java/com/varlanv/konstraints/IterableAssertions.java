@@ -2,19 +2,22 @@ package com.varlanv.konstraints;
 
 import java.util.function.Function;
 
-public interface IterableAssertions<ASSERTIONS, ITEM, ITEMS extends Iterable<ITEM>, ROOT, CURRENT> {
+public interface IterableAssertions<ITEM, ITEMS extends
+        Iterable<ITEM>, ROOT, CURRENT, ASSERTIONS extends BaseAssertionsSpec<?, ?>> extends BaseAssertionsSpec<ROOT, CURRENT> {
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertSize(Integer size);
+    ASSERTIONS assertions();
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertMinSize(Integer minSize);
+    IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> assertSize(Integer size);
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertMaxSize(Integer maxSize);
+    IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> assertMinSize(Integer minSize);
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertSizeRange(Integer minSize, Integer maxSize);
+    IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> assertMaxSize(Integer maxSize);
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertNotEmpty();
+    IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> assertSizeRange(Integer minSize, Integer maxSize);
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> assertEmpty();
+    IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> assertNotEmpty();
 
-    IterableAssertions<ASSERTIONS, ITEM, ITEMS, ROOT, CURRENT> eachItem(Function<ASSERTIONS, ASSERTIONS> action);
+    IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> assertEmpty();
+
+    IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> eachItem(Function<ASSERTIONS, BaseAssertionsSpec<?, ?>> action);
 }
