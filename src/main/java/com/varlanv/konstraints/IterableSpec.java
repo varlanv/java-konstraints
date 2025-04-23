@@ -11,20 +11,20 @@ public interface IterableSpec<PARENT, ROOT, CURRENT> {
   AssertionsSpec<ROOT, CURRENT> strings(
       Function<@NotNull CURRENT, @Nullable ITEMS> extract,
       Function<IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, IndexedStringAssertions<PARENT, ITEM, ROOT, CURRENT>>,
-          BaseAssertionsSpec<?, ?>> action);
+          RulesSpec<ROOT>> action);
 
   <ITEM extends Number & Comparable<ITEM>, ITEMS extends Iterable<ITEM>>
   AssertionsSpec<ROOT, CURRENT> numbers(
       Function<@NotNull CURRENT, @Nullable ITEMS> extract,
       Function<@NotNull IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, IndexedNumberAssertions<PARENT, ITEM, ROOT, CURRENT>>,
-          BaseAssertionsSpec<?, ?>> action
+          RulesSpec<ROOT>> action
   );
 
   <ITEM, ITEMS extends Iterable<ITEM>>
   AssertionsSpec<ROOT, CURRENT> nested(
       Function<@NotNull CURRENT, @Nullable ITEMS> extract,
       Function<@NotNull IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, IndexedAssertionsSpec<Child<ITEM, CURRENT>, ROOT, ITEM>>,
-          @NotNull BaseAssertionsSpec<?, ?>> action);
+          @NotNull RulesSpec<ROOT>> action);
 
   NullSpec<ROOT, CURRENT> parent();
 }

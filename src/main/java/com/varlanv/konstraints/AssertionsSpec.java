@@ -17,9 +17,6 @@ public interface AssertionsSpec<ROOT, CURRENT> extends BaseAssertionsSpec<ROOT, 
   AssertionsSpec<ROOT, CURRENT> mergeRules(Rules<ROOT> rules);
 
   @Override
-  Rules<ROOT> rules();
-
-  @Override
   Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn();
 
   static <ROOT, CURRENT> AssertionsSpec<ROOT, CURRENT> from(

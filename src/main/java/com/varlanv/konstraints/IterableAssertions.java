@@ -19,5 +19,5 @@ public interface IterableAssertions<ITEM, ITEMS extends
 
     IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> assertEmpty();
 
-    IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> eachItem(Function<ASSERTIONS, BaseAssertionsSpec<?, ?>> action);
+    IterableAssertions<ITEM, ITEMS, ROOT, CURRENT, ASSERTIONS> eachItem(Function<ASSERTIONS, RulesSpec<ROOT>> action);
 }

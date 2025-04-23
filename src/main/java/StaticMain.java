@@ -1,4 +1,3 @@
-import com.varlanv.konstraints.IterableAssertions;
 import com.varlanv.konstraints.Valid;
 
 import java.math.BigDecimal;
@@ -88,7 +87,21 @@ public class StaticMain {
                     .field("nestedListVals")
                     .nonNull()
                     .iterable()
-                    .nested(Nested2::nestedListVals, IterableAssertions::assertEmpty)
+                    .nested(Nested2::nestedListVals, nestedListVals -> nestedListVals
+                        .assertNotEmpty()
+                        .eachItem(nestedListVal -> nestedListVal
+                            .field("nestedListVals2")
+                            .nonNull()
+                            .iterable()
+                            .nested(NestedListVal1::nestedListVals2, nestedListVals2 -> nestedListVals2
+                                .assertMaxSize(1)
+                                .eachItem(nestedListVal2 -> nestedListVal2
+                                    .field("val4")
+                                    .nonNull()
+                                    .number(NestedListVal2::val4, val4 -> val4
+                                        .assertGte(5))))
+                        )
+                    )
                 )
             )
         )
