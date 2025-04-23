@@ -1,10 +1,5 @@
 package com.varlanv.konstraints;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
-import java.util.function.Function;
-
 public interface IterableAssertionsSpec<PARENT, ROOT, CURRENT> extends BaseAssertionsSpec<ROOT, CURRENT> {
 
   @Override
@@ -15,10 +10,4 @@ public interface IterableAssertionsSpec<PARENT, ROOT, CURRENT> extends BaseAsser
 
   @Override
   IterableAssertionsSpec<PARENT, ROOT, CURRENT> mergeRules(Rules<ROOT> rules);
-
-  @Override
-  Rules<ROOT> rules();
-
-  @Override
-  Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn();
 }

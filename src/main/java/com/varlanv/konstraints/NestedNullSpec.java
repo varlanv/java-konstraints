@@ -32,7 +32,4 @@ public interface NestedNullSpec<PARENT, ROOT, CURRENT> extends BaseNullSpec<ROOT
 
   @Override
   IterableSpec<CURRENT, ROOT, CURRENT> iterable();
-
-  @Override
-  Boolean allowNull();
 }

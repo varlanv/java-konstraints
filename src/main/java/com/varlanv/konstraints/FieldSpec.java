@@ -4,20 +4,18 @@ import java.util.function.Function;
 
 public interface FieldSpec<ROOT, CURRENT> extends BaseFieldSpec<ROOT, CURRENT> {
 
+  @Override
   <TARGET> AssertionsSpec<ROOT, CURRENT> assertNotNull(Function<CURRENT, TARGET> extract);
 
+  @Override
   <TARGET> AssertionsSpec<ROOT, CURRENT> assertNull(Function<CURRENT, TARGET> extract);
 
-  BaseNullSpec<ROOT, CURRENT> nonNull();
+  @Override
+  NullSpec<ROOT, CURRENT> nonNull();
 
-  BaseNullSpec<ROOT, CURRENT> nullable();
+  @Override
+  NullSpec<ROOT, CURRENT> nullable();
 
-  String fieldName();
-
+  @Override
   AssertionsSpec<ROOT, CURRENT> parent();
-
-  static <ROOT, CURRENT> FieldSpec<ROOT, CURRENT> of(
-      String fieldName, AssertionsSpec<ROOT, CURRENT> parent) {
-    return null;
-  }
 }

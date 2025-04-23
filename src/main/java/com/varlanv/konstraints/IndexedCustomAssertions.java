@@ -7,6 +7,7 @@ import java.util.function.Function;
 
 public interface IndexedCustomAssertions<TARGET, PARENT, ROOT, CURRENT> extends BaseCustomAssertions<TARGET, ROOT, CURRENT> {
 
+  @Override
   IndexedCustomAssertions<TARGET, PARENT, ROOT, CURRENT> assertTrue(
       Function<@NotNull TARGET, @NotNull Boolean> action);
 

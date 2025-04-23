@@ -17,8 +17,5 @@ public interface IndexedFieldSpec<PARENT, ROOT, CURRENT> extends BaseFieldSpec<R
   IndexedNullSpec<PARENT, ROOT, CURRENT> nullable();
 
   @Override
-  String fieldName();
-
-  @Override
   IndexedAssertionsSpec<PARENT, ROOT, CURRENT> parent();
 }

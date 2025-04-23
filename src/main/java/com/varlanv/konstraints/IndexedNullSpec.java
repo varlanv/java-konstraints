@@ -32,7 +32,4 @@ public interface IndexedNullSpec<PARENT, ROOT, CURRENT> extends BaseNullSpec<ROO
 
   @Override
   IterableSpec<CURRENT, ROOT, CURRENT> iterable();
-
-  @Override
-  Boolean allowNull();
 }

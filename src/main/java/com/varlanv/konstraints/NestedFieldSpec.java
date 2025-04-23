@@ -17,8 +17,5 @@ public interface NestedFieldSpec<PARENT, ROOT, CURRENT> extends BaseFieldSpec<RO
   NestedNullSpec<PARENT, ROOT, CURRENT> nullable();
 
   @Override
-  String fieldName();
-
-  @Override
   NestedAssertionsSpec<PARENT, ROOT, CURRENT> parent();
 }

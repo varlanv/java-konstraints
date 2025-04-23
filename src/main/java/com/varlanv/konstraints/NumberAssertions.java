@@ -8,9 +8,6 @@ public interface NumberAssertions<TARGET extends Comparable<TARGET>, ROOT, CURRE
     extends BaseNumberAssertions<TARGET, ROOT, CURRENT> {
 
   @Override
-  Rules<ROOT> rules();
-
-  @Override
   NumberAssertions<TARGET, ROOT, CURRENT> assertCustom(Predicate<@NotNull TARGET> action);
 
   @Override

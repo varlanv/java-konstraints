@@ -28,8 +28,4 @@ public interface IterableSpec<PARENT, ROOT, CURRENT> {
           @NotNull IterableAssertions<IndexedAssertionsSpec<Child<ITEM, CURRENT>, ROOT, ITEM>, ITEM, ITEMS, ROOT, CURRENT>> action);
 
   NullSpec<ROOT, CURRENT> parent();
-
-  static <PARENT, ROOT, CURRENT> IterableSpec<PARENT, ROOT, CURRENT> of(NullSpec<ROOT, CURRENT> nullSpec) {
-    return null;
-  }
 }
