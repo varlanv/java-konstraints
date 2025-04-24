@@ -5,13 +5,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
-public interface BaseAssertionsSpec<ROOT, CURRENT> extends RulesSpec<ROOT> {
+abstract class BaseAssertionsSpec<ROOT, CURRENT> extends RulesSpec<ROOT> {
 
-  BaseFieldSpec<ROOT, CURRENT> field(String fieldName);
+  public abstract BaseFieldSpec<ROOT, CURRENT> field(String fieldName);
 
-  BaseAssertionsSpec<ROOT, CURRENT> withRule(Rule<ROOT> rule);
+  abstract BaseAssertionsSpec<ROOT, CURRENT> withRule(Rule<ROOT> rule);
 
-  BaseAssertionsSpec<ROOT, CURRENT> mergeRules(Rules<ROOT> rules);
+  abstract BaseAssertionsSpec<ROOT, CURRENT> mergeRules(Rules<ROOT> rules);
 
-  Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn();
+  abstract Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn();
 }

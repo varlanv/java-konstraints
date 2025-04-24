@@ -1,6 +1,6 @@
 package com.varlanv.konstraints;
 
-public interface BaseIterableSpec<ROOT, CURRENT> {
+abstract class BaseIterableSpec<ROOT, CURRENT> {
 
-  BaseNullSpec<ROOT, CURRENT> parent();
+  abstract BaseNullSpec<ROOT, CURRENT> parent();
 }

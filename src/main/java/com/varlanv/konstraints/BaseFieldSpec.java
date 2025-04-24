@@ -2,17 +2,17 @@ package com.varlanv.konstraints;
 
 import java.util.function.Function;
 
-public interface BaseFieldSpec<ROOT, CURRENT> {
+abstract class BaseFieldSpec<ROOT, CURRENT> {
 
-  <TARGET> BaseAssertionsSpec<ROOT, CURRENT> assertNotNull(Function<CURRENT, TARGET> extract);
+  public abstract <TARGET> BaseAssertionsSpec<ROOT, CURRENT> assertNotNull(Function<CURRENT, TARGET> extract);
 
-  <TARGET> BaseAssertionsSpec<ROOT, CURRENT> assertNull(Function<CURRENT, TARGET> extract);
+  public abstract <TARGET> BaseAssertionsSpec<ROOT, CURRENT> assertNull(Function<CURRENT, TARGET> extract);
 
-  BaseNullSpec<ROOT, CURRENT> nonNull();
+  public abstract BaseNullSpec<ROOT, CURRENT> nonNull();
 
-  BaseNullSpec<ROOT, CURRENT> nullable();
+  public abstract BaseNullSpec<ROOT, CURRENT> nullable();
 
-  String fieldName();
+  abstract String fieldName();
 
-  BaseAssertionsSpec<ROOT, CURRENT> parent();
+  abstract BaseAssertionsSpec<ROOT, CURRENT> parent();
 }

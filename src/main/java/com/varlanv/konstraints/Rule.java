@@ -2,8 +2,7 @@ package com.varlanv.konstraints;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Optional;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
-public interface Rule<SUBJECT> extends Function<@NotNull SUBJECT, @NotNull Optional<Violation>> {
+interface Rule<SUBJECT> extends BiFunction<@NotNull SUBJECT, Violations, @NotNull Violations> {
 }

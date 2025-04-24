@@ -4,12 +4,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Function;
 
-public interface BaseCustomAssertions<TARGET, ROOT, CURRENT> {
+abstract class BaseCustomAssertions<TARGET, ROOT, CURRENT> extends RulesSpec<ROOT> {
 
-  BaseCustomAssertions<TARGET, ROOT, CURRENT> assertTrue(
+  abstract BaseCustomAssertions<TARGET, ROOT, CURRENT> assertTrue(
       Function<@NotNull TARGET, @NotNull Boolean> action);
 
-  Rules<ROOT> rules();
-
-  BaseNullSpec<ROOT, CURRENT> parent();
+  abstract BaseNullSpec<ROOT, CURRENT> parent();
 }

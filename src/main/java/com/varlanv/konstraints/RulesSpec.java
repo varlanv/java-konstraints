@@ -1,6 +1,6 @@
 package com.varlanv.konstraints;
 
-public interface RulesSpec<ROOT> {
+abstract class RulesSpec<ROOT> {
 
-  Rules<ROOT> rules();
+    abstract Rules<ROOT> rules();
 }

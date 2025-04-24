@@ -1,9 +1,7 @@
 package com.varlanv.konstraints;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Unmodifiable;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -17,7 +15,7 @@ public interface Valid<SUBJECT> {
 
   SUBJECT orElseThrow(Supplier<? extends Throwable> exceptionSupplier);
 
-  SUBJECT orElseThrow(Function<List<Violation>, ? extends Throwable> exceptionFn);
+  SUBJECT orElseThrow(Function<Violations, ? extends Throwable> exceptionFn);
 
   Optional<SUBJECT> optional();
 
@@ -25,8 +23,7 @@ public interface Valid<SUBJECT> {
 
   boolean isNotValid();
 
-  @Unmodifiable
-  List<Violation> violations();
+  Violations violations();
 
   static <SUBJECT> Valid<SUBJECT> valid(SUBJECT value) {
     Objects.requireNonNull(value);
@@ -60,7 +57,7 @@ public interface Valid<SUBJECT> {
       }
 
       @Override
-      public SUBJECT orElseThrow(Function<List<Violation>, ? extends Throwable> exceptionFn) {
+      public SUBJECT orElseThrow(Function<Violations, ? extends Throwable> exceptionFn) {
         return supplier.get();
       }
 
@@ -80,17 +77,16 @@ public interface Valid<SUBJECT> {
       }
 
       @Override
-      public List<Violation> violations() {
-        return List.of();
+      public Violations violations() {
+        return Violations.create();
       }
     };
   }
 
-  static <SUBJECT> Valid<SUBJECT> invalid(List<Violation> violations) {
+  static <SUBJECT> Valid<SUBJECT> invalid(Violations violations) {
     if (violations.isEmpty()) {
       throw new IllegalArgumentException("Violations must not be empty");
     }
-    var violationsCopy = List.copyOf(violations);
     return new Valid<>() {
 
       @Override
@@ -109,8 +105,8 @@ public interface Valid<SUBJECT> {
       }
 
       @Override
-      public SUBJECT orElseThrow(Function<List<Violation>, ? extends Throwable> exceptionFn) {
-        throw Internals.hide(exceptionFn.apply(violationsCopy));
+      public SUBJECT orElseThrow(Function<Violations, ? extends Throwable> exceptionFn) {
+        throw Internals.hide(exceptionFn.apply(violations));
       }
 
       @Override
@@ -129,8 +125,8 @@ public interface Valid<SUBJECT> {
       }
 
       @Override
-      public List<Violation> violations() {
-        return violationsCopy;
+      public Violations violations() {
+        return violations;
       }
 
       private <MIRROR> Valid<MIRROR> self() {
@@ -142,13 +138,14 @@ public interface Valid<SUBJECT> {
   }
 
   static <SUBJECT> ValidationSpec<SUBJECT> validationSpec(
-      Function<AssertionsSpec<SUBJECT, SUBJECT>, AssertionsSpec<SUBJECT, SUBJECT>> specAction) {
-    return ValidationSpec.fromRules(
+      Function<RootAssertionsSpec<SUBJECT, SUBJECT>, RootAssertionsSpec<SUBJECT, SUBJECT>> specAction) {
+    return new RulesValidationSpec<>(
         specAction.apply(
-            AssertionsSpec.from(
-                Rules.create(),
-                Function.identity()
-            )
+            null
+//            AssertionsSpec.from(
+//                Rules.empty(),
+//                Function.identity()
+//            )
         ).rules()
     );
   }

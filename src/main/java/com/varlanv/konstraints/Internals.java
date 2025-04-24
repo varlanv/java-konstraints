@@ -3,6 +3,7 @@ package com.varlanv.konstraints;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -11,18 +12,35 @@ import java.util.function.Supplier;
 
 interface Internals {
 
-  static <T> Supplier<@NotNull T> onceSupplier(Supplier<@NotNull T> delegate) {
-    Objects.requireNonNull(delegate);
-    @SuppressWarnings("unchecked")
-    var cache = (T[]) new Object[1];
-    return () -> {
-      var cached = cache[0];
-      if (cached == null) {
-        cached = Objects.requireNonNull(delegate.get());
-        cache[0] = cached;
+  class LazySupplier<T> implements Supplier<T> {
+
+    @Nullable
+    private T cached;
+    private final Supplier<@NotNull T> delegate;
+
+    private LazySupplier(Supplier<@NotNull T> delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public T get() {
+      var val = cached;
+      if (val == null) {
+        val = delegate.get();
+        cached = val;
       }
-      return cached;
-    };
+      return val;
+
+    }
+
+    T or(T other) {
+      return Objects.requireNonNullElse(cached, other);
+    }
+  }
+
+
+  static <T> Supplier<@NotNull T> onceSupplier(Supplier<@NotNull T> delegate) {
+    return new LazySupplier<>(delegate);
   }
 
   static <IN, OUT> Function<@NotNull IN, @NotNull Optional<OUT>> wrapOptional(
@@ -52,10 +70,23 @@ interface Internals {
     }
     @SuppressWarnings("unchecked")
     T[] result = (T[]) resultArray;
-    return List.of(result);
+    return Arrays.asList(result);
   }
 
-  static <T> List<T> addToList(List<T> left, T right) {
-    return mergeLists(left, List.of(right));
+  static <T> List<T> newListWithItem(List<T> left, T right) {
+    var size = left.size();
+    if (size == 0) {
+      return List.of(right);
+    } else if (size == 1) {
+      return List.of(left.get(0), right);
+    }
+    var resultArray = new Object[size + 1];
+    for (var idx = 0; idx < size; idx++) {
+      resultArray[idx] = left.get(idx);
+    }
+    resultArray[size] = right;
+    @SuppressWarnings("unchecked")
+    T[] result = (T[]) resultArray;
+    return Arrays.asList(result);
   }
 }

@@ -1,33 +1,51 @@
 package com.varlanv.konstraints;
 
-import org.jetbrains.annotations.Unmodifiable;
-
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-public interface Rules<SUBJECT> {
+abstract class Rules<SUBJECT> {
 
-  Rules<SUBJECT> add(Rule<SUBJECT> rule);
+  private static final Rules<?> empty = new Rules<>() {
+    @Override
+    Rules<Object> add(Rule<Object> rule) {
+      return create(List.of(rule));
+    }
 
-  Rules<SUBJECT> merge(Rules<SUBJECT> other);
+    @Override
+    Rules<Object> merge(Rules<Object> other) {
+      return other;
+    }
 
-  @Unmodifiable
-  List<Violation> apply(SUBJECT t);
+    @Override
+    Violations apply(Object t) {
+      return Violations.create();
+    }
 
-  List<Rule<SUBJECT>> list();
+    @Override
+    List<Rule<Object>> list() {
+      return List.of();
+    }
+  };
 
-  static <SUBJECT> Rules<SUBJECT> create() {
-    return create(List.of());
+  abstract Rules<SUBJECT> add(Rule<SUBJECT> rule);
+
+  abstract Rules<SUBJECT> merge(Rules<SUBJECT> other);
+
+  abstract Violations apply(SUBJECT t);
+
+  abstract List<Rule<SUBJECT>> list();
+
+  static <SUBJECT> Rules<SUBJECT> empty() {
+    @SuppressWarnings("unchecked")
+    var instance = (Rules<SUBJECT>) empty;
+    return instance;
   }
 
-  static <SUBJECT> Rules<SUBJECT> create(List<Rule<SUBJECT>> incomeRules) {
-    var rules = List.copyOf(incomeRules);
+  static <SUBJECT> Rules<SUBJECT> create(List<Rule<SUBJECT>> rules) {
     return new Rules<>() {
 
       @Override
       public Rules<SUBJECT> add(Rule<SUBJECT> rule) {
-        return Rules.create(Internals.addToList(rules, rule));
+        return Rules.create(Internals.newListWithItem(rules, rule));
       }
 
       @Override
@@ -40,18 +58,12 @@ public interface Rules<SUBJECT> {
       }
 
       @Override
-      public List<Violation> apply(SUBJECT t) {
-        List<Violation> violations = null;
+      public Violations apply(SUBJECT t) {
+        Violations violations = EmptyToMutableViolations.INSTANCE;
         for (var rule : rules) {
-          var maybeViolation = rule.apply(t);
-          if (maybeViolation.isPresent()) {
-            if (violations == null) {
-              violations = new ArrayList<>(5);
-            }
-            violations.add(maybeViolation.get());
-          }
+          violations = rule.apply(t, violations);
         }
-        return violations == null ? List.of() : Collections.unmodifiableList(violations);
+        return ImmutableTrustedViolations.of(violations.list());
       }
 
       @Override
