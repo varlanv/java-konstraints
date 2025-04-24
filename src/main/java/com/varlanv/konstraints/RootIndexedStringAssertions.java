@@ -3,6 +3,7 @@ package com.varlanv.konstraints;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Range;
 
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -10,19 +11,32 @@ import java.util.regex.Pattern;
 public final class RootIndexedStringAssertions<TARGET extends CharSequence, ROOT, CURRENT>
     extends BaseStringAssertions<TARGET, ROOT, CURRENT> {
 
-  @Override
   public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
-      Function<@NotNull String, @NotNull String> message, Predicate<@NotNull TARGET> action) {
+      BiFunction<@NotNull String, TARGET, @NotNull Violation> violation,
+      Predicate<@NotNull TARGET> action) {
     return null;
   }
 
   public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustomWithIndex(
-      Function<@NotNull String, @NotNull String> message, IndexPredicate<@NotNull TARGET> action) {
+      IndexBiFunction<@NotNull String, TARGET, @NotNull Violation> violation,
+      IndexPredicate<@NotNull TARGET> action) {
     return null;
   }
 
   public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustomWithParent(
-      Function<@NotNull String, @NotNull String> message, IndexBiPredicate<@NotNull TARGET, @NotNull CURRENT> action) {
+      IndexTriFunction<@NotNull String, TARGET, CURRENT, @NotNull Violation> violation,
+      IndexBiPredicate<@NotNull TARGET, @NotNull CURRENT> action) {
+    return null;
+  }
+
+  @Override
+  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
+      Function<@NotNull String, @NotNull Violation> violation, Predicate<@NotNull TARGET> action) {
+    return null;
+  }
+
+  @Override
+  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustom(String message, Predicate<@NotNull TARGET> action) {
     return null;
   }
 

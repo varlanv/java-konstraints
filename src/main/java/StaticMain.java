@@ -1,4 +1,5 @@
 import com.varlanv.konstraints.Valid;
+import com.varlanv.konstraints.Violation;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -36,12 +37,15 @@ public class StaticMain {
         .nonNull()
         .string(Root::strValue, strValueSpec -> strValueSpec
             .assertLength(1)
-            .assertCustom(fieldName -> "abc", (str, parent) -> parent.strValue().isBlank()))
+            .assertCustom("Fail", String::isBlank)
+            .assertCustom(field -> Violation.of("fail"), String::isBlank)
+            .assertCustomWithParent((str, val, parent) -> Violation.of("fail"), (str, parent) -> parent.strValue().isBlank()))
         .field("longVal")
         .nonNull()
         .number(Root::longVal, longValSpec -> longValSpec
             .assertLte(1L)
-            .assertCustom((lng, parent) -> parent.longVal() > 10L))
+            .assertCustom("Fail", val -> val == 1L)
+            .assertCustomWithParent((fieldName, val, parent) -> Violation.of(""), (lng, parent) -> parent.longVal() > 10L))
         .field("stringList")
         .nonNull()
         .iterable()
@@ -49,10 +53,11 @@ public class StaticMain {
             .assertEmpty()
             .eachItem(itemSpec -> itemSpec
                 .assertNotEmpty()
-                .assertCustom(field -> "123", str -> str.length() > 1)
-                .assertCustomWithIndex(field -> "123", (str, idx) -> idx == 1)
-                .assertCustomWithParent(field -> "123", (str, parent, idx) -> parent.longVal() == 1L)
-                .assertCustomWithParent(field -> "123", (str, parent, idx) -> idx == 1)))
+                .assertCustom("Error", str -> str.length() > 1)
+                .assertCustom(field -> Violation.of("123"), str -> str.length() > 1)
+                .assertCustomWithIndex((field, val, idx) -> Violation.of("123"), (str, idx) -> idx == 1)
+                .assertCustomWithParent((field, val, parent, idx) -> Violation.of("123"), (str, parent, idx) -> parent.longVal() == 1L)
+                .assertCustomWithParent((field, val, parent, idx) -> Violation.of("123"), (str, parent, idx) -> idx == 1)))
     );
   }
 

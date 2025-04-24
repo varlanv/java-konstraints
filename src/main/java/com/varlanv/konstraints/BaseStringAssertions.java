@@ -11,7 +11,11 @@ abstract class BaseStringAssertions<TARGET extends CharSequence, ROOT, CURRENT>
     extends RulesSpec<ROOT> {
 
   public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
-      Function<@NotNull String, @NotNull String> message,
+      Function<@NotNull String, @NotNull Violation> violation,
+      Predicate<@NotNull TARGET> action);
+
+  public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
+      String message,
       Predicate<@NotNull TARGET> action);
 
   public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertEmpty();

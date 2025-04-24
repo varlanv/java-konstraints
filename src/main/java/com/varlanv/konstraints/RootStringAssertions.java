@@ -3,10 +3,10 @@ package com.varlanv.konstraints;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Range;
 
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 public final class RootStringAssertions<TARGET extends CharSequence, ROOT, CURRENT>
@@ -17,14 +17,20 @@ public final class RootStringAssertions<TARGET extends CharSequence, ROOT, CURRE
     return null;
   }
 
-  @Override
-  public RootStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
-      Function<@NotNull String, @NotNull Violation> message, Predicate<@NotNull TARGET> action) {
+
+  public RootStringAssertions<TARGET, ROOT, CURRENT> assertCustomWithParent(
+      TriFunction<@NotNull String, TARGET, CURRENT, @NotNull Violation> violation,
+      BiPredicate<@NotNull TARGET, @NotNull CURRENT> action) {
     return null;
   }
 
-  public RootStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
-      Function<@NotNull String, @NotNull Violation> message, BiPredicate<@NotNull TARGET, @NotNull CURRENT> action) {
+  @Override
+  public RootStringAssertions<TARGET, ROOT, CURRENT> assertCustom(Function<@NotNull String, @NotNull Violation> violation, Predicate<@NotNull TARGET> action) {
+    return null;
+  }
+
+  @Override
+  public RootStringAssertions<TARGET, ROOT, CURRENT> assertCustom(String message, Predicate<@NotNull TARGET> action) {
     return null;
   }
 
