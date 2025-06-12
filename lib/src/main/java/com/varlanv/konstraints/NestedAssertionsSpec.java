@@ -1,0 +1,34 @@
+package com.varlanv.konstraints;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Function;
+
+public final class NestedAssertionsSpec<PARENT, ROOT, CURRENT> extends BaseAssertionsSpec<ROOT, CURRENT> {
+
+    @Override
+    public BaseFieldSpec<ROOT, CURRENT> field(String fieldName) {
+        return null;
+    }
+
+    @Override
+    BaseAssertionsSpec<ROOT, CURRENT> withRule(Rule<ROOT> rule) {
+        return null;
+    }
+
+    @Override
+    BaseAssertionsSpec<ROOT, CURRENT> mergeRules(Rules<ROOT> rules) {
+        return null;
+    }
+
+    @Override
+    Function<@NotNull ROOT, @Nullable CURRENT> currentNestFn() {
+        return null;
+    }
+
+    @Override
+    Rules<ROOT> rules() {
+        return null;
+    }
+}
