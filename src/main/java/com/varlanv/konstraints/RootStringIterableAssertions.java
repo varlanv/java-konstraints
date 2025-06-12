@@ -30,7 +30,7 @@ public final class RootStringIterableAssertions<
     return null;
   }
 
-  public RootStringIterableAssertions<ITEM, ITEMS, ROOT, CURRENT> assertEmpty() {
+  public RootStringIterableAssertions<ITEM, ITEMS, ROOT, CURRENT> empty() {
     return null;
   }
 

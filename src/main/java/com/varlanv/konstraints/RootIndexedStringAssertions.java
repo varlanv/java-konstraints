@@ -11,32 +11,32 @@ import java.util.regex.Pattern;
 public final class RootIndexedStringAssertions<TARGET extends CharSequence, ROOT, CURRENT>
     extends BaseStringAssertions<TARGET, ROOT, CURRENT> {
 
-  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
+  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> custom(
       BiFunction<@NotNull String, TARGET, @NotNull Violation> violation,
       Predicate<@NotNull TARGET> action) {
     return null;
   }
 
-  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustomWithIndex(
+  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> customIndexed(
       IndexBiFunction<@NotNull String, TARGET, @NotNull Violation> violation,
       IndexPredicate<@NotNull TARGET> action) {
     return null;
   }
 
-  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustomWithParent(
+  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> customContextual(
       IndexTriFunction<@NotNull String, TARGET, CURRENT, @NotNull Violation> violation,
       IndexBiPredicate<@NotNull TARGET, @NotNull CURRENT> action) {
     return null;
   }
 
   @Override
-  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
+  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> custom(
       Function<@NotNull String, @NotNull Violation> violation, Predicate<@NotNull TARGET> action) {
     return null;
   }
 
   @Override
-  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertCustom(String message, Predicate<@NotNull TARGET> action) {
+  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> custom(String message, Predicate<@NotNull TARGET> action) {
     return null;
   }
 
@@ -46,7 +46,7 @@ public final class RootIndexedStringAssertions<TARGET extends CharSequence, ROOT
   }
 
   @Override
-  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertNotEmpty() {
+  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> notEmpty() {
     return null;
   }
 
@@ -56,7 +56,7 @@ public final class RootIndexedStringAssertions<TARGET extends CharSequence, ROOT
   }
 
   @Override
-  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> assertLength(
+  public RootIndexedStringAssertions<TARGET, ROOT, CURRENT> len(
       @Range(from = 1, to = Integer.MAX_VALUE) Integer length) {
     return null;
   }

@@ -10,21 +10,21 @@ import java.util.regex.Pattern;
 abstract class BaseStringAssertions<TARGET extends CharSequence, ROOT, CURRENT>
     extends RulesSpec<ROOT> {
 
-  public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
+  public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> custom(
       Function<@NotNull String, @NotNull Violation> violation,
       Predicate<@NotNull TARGET> action);
 
-  public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertCustom(
+  public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> custom(
       String message,
       Predicate<@NotNull TARGET> action);
 
   public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertEmpty();
 
-  public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertNotEmpty();
+  public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> notEmpty();
 
   public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertNotBlank();
 
-  public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertLength(
+  public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> len(
       @Range(from = 1, to = Integer.MAX_VALUE) Integer length);
 
   public abstract BaseStringAssertions<TARGET, ROOT, CURRENT> assertMinLength(

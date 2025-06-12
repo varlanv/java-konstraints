@@ -2,7 +2,6 @@ package com.varlanv.konstraints;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -10,19 +9,19 @@ import java.util.function.Predicate;
 public final class RootNumberAssertions<TARGET extends Comparable<TARGET>, ROOT, CURRENT>
     extends BaseNumberAssertions<TARGET, ROOT, CURRENT> {
 
-  public RootNumberAssertions<TARGET, ROOT, CURRENT> assertCustomWithParent(
+  public RootNumberAssertions<TARGET, ROOT, CURRENT> customContextual(
       TriFunction<@NotNull String, TARGET, CURRENT, @NotNull Violation> violation,
       BiPredicate<@NotNull TARGET, @NotNull CURRENT> action) {
     return null;
   }
 
-  public RootNumberAssertions<TARGET, ROOT, CURRENT> assertCustom(Function<@NotNull String, @NotNull Violation> violation,
-                                                                  Predicate<@NotNull TARGET> action) {
+  public RootNumberAssertions<TARGET, ROOT, CURRENT> custom(Function<@NotNull String, @NotNull Violation> violation,
+                                                            Predicate<@NotNull TARGET> action) {
     return null;
   }
 
   @Override
-  public RootNumberAssertions<TARGET, ROOT, CURRENT> assertCustom(String message, Predicate<@NotNull TARGET> action) {
+  public RootNumberAssertions<TARGET, ROOT, CURRENT> custom(String message, Predicate<@NotNull TARGET> action) {
     return null;
   }
 
@@ -32,7 +31,7 @@ public final class RootNumberAssertions<TARGET extends Comparable<TARGET>, ROOT,
   }
 
   @Override
-  public RootNumberAssertions<TARGET, ROOT, CURRENT> assertLte(TARGET target) {
+  public RootNumberAssertions<TARGET, ROOT, CURRENT> lte(TARGET target) {
     return null;
   }
 

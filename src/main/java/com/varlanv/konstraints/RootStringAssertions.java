@@ -3,7 +3,6 @@ package com.varlanv.konstraints;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Range;
 
-import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -18,19 +17,19 @@ public final class RootStringAssertions<TARGET extends CharSequence, ROOT, CURRE
   }
 
 
-  public RootStringAssertions<TARGET, ROOT, CURRENT> assertCustomWithParent(
+  public RootStringAssertions<TARGET, ROOT, CURRENT> customContextual(
       TriFunction<@NotNull String, TARGET, CURRENT, @NotNull Violation> violation,
       BiPredicate<@NotNull TARGET, @NotNull CURRENT> action) {
     return null;
   }
 
   @Override
-  public RootStringAssertions<TARGET, ROOT, CURRENT> assertCustom(Function<@NotNull String, @NotNull Violation> violation, Predicate<@NotNull TARGET> action) {
+  public RootStringAssertions<TARGET, ROOT, CURRENT> custom(Function<@NotNull String, @NotNull Violation> violation, Predicate<@NotNull TARGET> action) {
     return null;
   }
 
   @Override
-  public RootStringAssertions<TARGET, ROOT, CURRENT> assertCustom(String message, Predicate<@NotNull TARGET> action) {
+  public RootStringAssertions<TARGET, ROOT, CURRENT> custom(String message, Predicate<@NotNull TARGET> action) {
     return null;
   }
 
@@ -40,7 +39,7 @@ public final class RootStringAssertions<TARGET extends CharSequence, ROOT, CURRE
   }
 
   @Override
-  public RootStringAssertions<TARGET, ROOT, CURRENT> assertNotEmpty() {
+  public RootStringAssertions<TARGET, ROOT, CURRENT> notEmpty() {
     return null;
   }
 
@@ -50,7 +49,7 @@ public final class RootStringAssertions<TARGET extends CharSequence, ROOT, CURRE
   }
 
   @Override
-  public RootStringAssertions<TARGET, ROOT, CURRENT> assertLength(@Range(from = 1, to = Integer.MAX_VALUE) Integer length) {
+  public RootStringAssertions<TARGET, ROOT, CURRENT> len(@Range(from = 1, to = Integer.MAX_VALUE) Integer length) {
     return null;
   }
 

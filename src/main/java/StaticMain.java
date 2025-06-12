@@ -36,28 +36,28 @@ public class StaticMain {
         .field("strValue")
         .nonNull()
         .string(Root::strValue, strValueSpec -> strValueSpec
-            .assertLength(1)
-            .assertCustom("Fail", String::isBlank)
-            .assertCustom(field -> Violation.of("fail"), String::isBlank)
-            .assertCustomWithParent((str, val, parent) -> Violation.of("fail"), (str, parent) -> parent.strValue().isBlank()))
+            .len(1)
+            .custom("Fail", String::isBlank)
+            .custom(field -> Violation.of("fail"), String::isBlank)
+            .customContextual((str, val, parent) -> Violation.of("fail"), (str, parent) -> parent.strValue().isBlank()))
         .field("longVal")
         .nonNull()
         .number(Root::longVal, longValSpec -> longValSpec
-            .assertLte(1L)
-            .assertCustom("Fail", val -> val == 1L)
-            .assertCustomWithParent((fieldName, val, parent) -> Violation.of(""), (lng, parent) -> parent.longVal() > 10L))
+            .lte(1L)
+            .custom("Fail", val -> val == 1L)
+            .customContextual((fieldName, val, parent) -> Violation.of(""), (lng, parent) -> parent.longVal() > 10L))
         .field("stringList")
         .nonNull()
         .iterable()
         .strings(Root::stringList, stringListSpec -> stringListSpec
-            .assertEmpty()
+            .empty()
             .eachItem(itemSpec -> itemSpec
-                .assertNotEmpty()
-                .assertCustom("Error", str -> str.length() > 1)
-                .assertCustom(field -> Violation.of("123"), str -> str.length() > 1)
-                .assertCustomWithIndex((field, val, idx) -> Violation.of("123"), (str, idx) -> idx == 1)
-                .assertCustomWithParent((field, val, parent, idx) -> Violation.of("123"), (str, parent, idx) -> parent.longVal() == 1L)
-                .assertCustomWithParent((field, val, parent, idx) -> Violation.of("123"), (str, parent, idx) -> idx == 1)))
+                .notEmpty()
+                .custom("Error", str -> str.length() > 1)
+                .custom(field -> Violation.of("123"), str -> str.length() > 1)
+                .customIndexed((field, val, idx) -> Violation.of("123"), (str, idx) -> idx == 1)
+                .customContextual((field, val, parent, idx) -> Violation.of("123"), (str, parent, idx) -> parent.longVal() == 1L)
+                .customContextual((field, val, parent, idx) -> Violation.of("123"), (str, parent, idx) -> idx == 1)))
     );
   }
 
