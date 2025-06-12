@@ -1,9 +1,8 @@
 package com.varlanv.konstraints;
 
+import java.util.function.Function;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.function.Function;
 
 public final class NestedAssertionsSpec<PARENT, ROOT, CURRENT> extends BaseAssertionsSpec<ROOT, CURRENT> {
 

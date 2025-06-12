@@ -1,17 +1,17 @@
-//package com.varlanv.konstraints;
+// package com.varlanv.konstraints;
 //
-//import org.junit.jupiter.api.Nested;
-//import org.junit.jupiter.api.Test;
+// import org.junit.jupiter.api.Nested;
+// import org.junit.jupiter.api.Test;
 //
-//import java.math.BigDecimal;
-//import java.util.List;
-//import java.util.Optional;
-//import java.util.concurrent.atomic.AtomicReference;
-//import java.util.regex.Pattern;
+// import java.math.BigDecimal;
+// import java.util.List;
+// import java.util.Optional;
+// import java.util.concurrent.atomic.AtomicReference;
+// import java.util.regex.Pattern;
 //
-//import static org.junit.jupiter.api.Assertions.*;
+// import static org.junit.jupiter.api.Assertions.*;
 //
-//class ValidTest {
+// class ValidTest {
 //
 //    @Test
 //    void stringField__isEmpty__should_correctly_validate_empty_strings_and_null() {
@@ -444,8 +444,10 @@
 //                chain.stringField(Rec::strValue, "email").matches(pattern).rejectingNull()
 //        );
 //
-//        assertThrows(RuntimeException.class, () -> spec.validate(new Rec(null)).orElseThrow(() -> new RuntimeException("Invalid")));
-//        assertEquals("johndoe@gmail.com", spec.validate(new Rec("johndoe@gmail.com")).orElseThrow(() -> new RuntimeException("Invalid")).strValue());
+//        assertThrows(RuntimeException.class, () -> spec.validate(new Rec(null)).orElseThrow(() -> new
+// RuntimeException("Invalid")));
+//        assertEquals("johndoe@gmail.com", spec.validate(new Rec("johndoe@gmail.com")).orElseThrow(() -> new
+// RuntimeException("Invalid")).strValue());
 //    }
 //
 //    @Test
@@ -523,8 +525,11 @@
 //        assertThrows(RuntimeException.class, () -> function.apply(new Rec(new BigDecimal("0.9"))));
 //        assertThrows(RuntimeException.class, () -> function.apply(new Rec(new BigDecimal("10.1"))));
 //        assertThrows(RuntimeException.class, () -> function.apply(new Rec(null)));
-//        assertEquals(0, function.apply(new Rec(new BigDecimal("5.0"))).decimalValue().compareTo(new BigDecimal("5.0")));
-//        assertEquals(0, function.apply(new Rec(new BigDecimal("1.0"))).decimalValue().compareTo(new BigDecimal("1.0")));
-//        assertEquals(0, function.apply(new Rec(new BigDecimal("10.0"))).decimalValue().compareTo(new BigDecimal("10.0")));
+//        assertEquals(0, function.apply(new Rec(new BigDecimal("5.0"))).decimalValue().compareTo(new
+// BigDecimal("5.0")));
+//        assertEquals(0, function.apply(new Rec(new BigDecimal("1.0"))).decimalValue().compareTo(new
+// BigDecimal("1.0")));
+//        assertEquals(0, function.apply(new Rec(new BigDecimal("10.0"))).decimalValue().compareTo(new
+// BigDecimal("10.0")));
 //    }
-//}
+// }
