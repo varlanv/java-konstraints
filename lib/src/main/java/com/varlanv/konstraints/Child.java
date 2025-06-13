@@ -1,7 +1,7 @@
 package com.varlanv.konstraints;
 
 import java.util.function.Supplier;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 public interface Child<SELF, PARENT> {
 
@@ -23,7 +23,7 @@ public interface Child<SELF, PARENT> {
         };
     }
 
-    static <SELF, PARENT> Child<SELF, PARENT> lazyParent(SELF self, Supplier<@NotNull PARENT> parent) {
+    static <SELF, PARENT> Child<SELF, PARENT> lazyParent(SELF self, Supplier<@NonNull PARENT> parent) {
         return new Child<>() {
             @Override
             public SELF value() {
@@ -37,7 +37,7 @@ public interface Child<SELF, PARENT> {
         };
     }
 
-    static <SELF, PARENT> Child<SELF, PARENT> lazy(Supplier<SELF> self, Supplier<@NotNull PARENT> parent) {
+    static <SELF, PARENT> Child<SELF, PARENT> lazy(Supplier<SELF> self, Supplier<@NonNull PARENT> parent) {
         return new Child<>() {
             @Override
             public SELF value() {

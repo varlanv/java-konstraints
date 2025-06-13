@@ -6,8 +6,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NonNull;
 
 interface Internals {
 
@@ -15,9 +15,9 @@ interface Internals {
 
         @Nullable private T cached;
 
-        private final Supplier<@NotNull T> delegate;
+        private final Supplier<@NonNull T> delegate;
 
-        private LazySupplier(Supplier<@NotNull T> delegate) {
+        private LazySupplier(Supplier<@NonNull T> delegate) {
             this.delegate = delegate;
         }
 
@@ -36,12 +36,12 @@ interface Internals {
         }
     }
 
-    static <T> Supplier<@NotNull T> onceSupplier(Supplier<@NotNull T> delegate) {
+    static <T> Supplier<@NonNull T> onceSupplier(Supplier<@NonNull T> delegate) {
         return new LazySupplier<>(delegate);
     }
 
-    static <IN, OUT> Function<@NotNull IN, @NotNull Optional<OUT>> wrapOptional(
-            Function<@NotNull IN, @Nullable OUT> fn) {
+    static <IN, OUT> Function<@NonNull IN, @NonNull Optional<OUT>> wrapOptional(
+            Function<@NonNull IN, @Nullable OUT> fn) {
         return t -> Optional.ofNullable(fn.apply(t));
     }
 

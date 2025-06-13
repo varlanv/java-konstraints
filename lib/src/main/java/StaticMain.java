@@ -1,5 +1,4 @@
 import com.varlanv.konstraints.Valid;
-import com.varlanv.konstraints.Violation;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
@@ -13,34 +12,20 @@ public class StaticMain {
     private static void tst2() {
         Valid.<Root>validationSpec(rootSpec -> rootSpec.field("strValue")
                 .nonNull()
-                .string(Root::strValue, strValueSpec -> strValueSpec
-                        .len(1)
-                        .check("Fail", String::isBlank)
-                        .check(field -> Violation.of("fail"), String::isBlank)
-                        .checkContextual((str, val, parent) -> Violation.of("fail"), (str, parent) -> parent.strValue()
-                                .isBlank()))
-                .field("longVal")
+                .string(Root::strValue, strValueSpec -> strValueSpec.length(1).check("Fail", String::isBlank))
+                .field("longValue")
+                .nullable()
+                .number(Root::longVal, longValSpec -> longValSpec.inRange(1L, 3L))
+                .field("nested1")
                 .nonNull()
-                .number(Root::longVal, longValSpec -> longValSpec
-                        .lte(1L)
-                        .check("Fail", val -> val == 1L)
-                        .checkContextual(
-                                (fieldName, val, parent) -> Violation.of(""), (lng, parent) -> parent.longVal() > 10L))
-                .field("stringList")
-                .nonNull()
-                .iterable()
-                .strings(
-                        Root::stringList,
-                        stringListSpec -> stringListSpec.notEmpty().eachItem(itemSpec -> itemSpec.notEmpty()
-                                .check("Error", str -> str.length() > 1)
-                                .check(field -> Violation.of("123"), str -> str.length() > 1)
-                                .checkIndexed((field, val, idx) -> Violation.of("123"), (str, idx) -> idx == 1)
-                                .checkContextual(
-                                        (field, val, parent, idx) -> Violation.of("123"),
-                                        (str, parent, idx) -> parent.longVal() == 1L)
-                                .checkContextual(
-                                        (field, val, parent, idx) -> Violation.of("123"),
-                                        (str, parent, idx) -> idx == 1))));
+                .nested(Root::nested1, nested1Spec -> nested1Spec
+                        .field("")
+                        .nullable()
+                        .nested(Nested1::nested2, nested2Spec -> nested2Spec
+                                .field("val2")
+                                .nonNull()
+                                .string(Nested2::val2, val2Spec -> val2Spec.length(1)
+                                        .check("Fail", String::isBlank)))));
     }
 
     private static void tst() {

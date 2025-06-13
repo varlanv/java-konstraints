@@ -14,24 +14,25 @@ final class RulesValidationSpec<SUBJECT> implements ValidationSpec<SUBJECT> {
     }
 
     @Override
-    public Function<SUBJECT, Valid<SUBJECT>> toValidationFunction() {
+    public Function<SUBJECT, Valid<SUBJECT>> toFunction() {
         return this::validate;
     }
 
     @Override
-    public UnaryOperator<SUBJECT> toValidationFunction(Function<Violations, ? extends Throwable> onException) {
-        Objects.requireNonNull(onException);
+    public UnaryOperator<SUBJECT> toFailingValidationOperator(Function<Violations, ? extends Throwable> onException) {
+        Objects.requireNonNull(onException, "nulls are not supported");
         return t -> validate(t).orElseThrow(onException);
     }
 
     @Override
-    public UnaryOperator<SUBJECT> toValidationFunction(Supplier<? extends Throwable> onException) {
-        Objects.requireNonNull(onException);
+    public UnaryOperator<SUBJECT> toThrowingOperator(Supplier<? extends Throwable> onException) {
+        Objects.requireNonNull(onException, "nulls are not supported");
         return t -> validate(t).orElseThrow(onException);
     }
 
     @Override
     public Valid<SUBJECT> validate(SUBJECT t) {
+        Objects.requireNonNull(t, "nulls are not supported");
         var violations = rules.apply(Objects.requireNonNull(t));
         if (violations.isEmpty()) {
             return Valid.valid(t);

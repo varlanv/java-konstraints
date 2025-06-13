@@ -1,4 +1,4 @@
-@NotNullByDefault
+@NullMarked
 package com.varlanv.konstraints;
 
-import org.jetbrains.annotations.NotNullByDefault;
+import org.jspecify.annotations.NullMarked;

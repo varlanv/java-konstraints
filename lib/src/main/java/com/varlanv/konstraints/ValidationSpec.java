@@ -6,11 +6,11 @@ import java.util.function.UnaryOperator;
 
 public interface ValidationSpec<SUBJECT> {
 
-    Function<SUBJECT, Valid<SUBJECT>> toValidationFunction();
+    Function<SUBJECT, Valid<SUBJECT>> toFunction();
 
-    UnaryOperator<SUBJECT> toValidationFunction(Function<Violations, ? extends Throwable> onException);
+    UnaryOperator<SUBJECT> toFailingValidationOperator(Function<Violations, ? extends Throwable> onException);
 
-    UnaryOperator<SUBJECT> toValidationFunction(Supplier<? extends Throwable> onException);
+    UnaryOperator<SUBJECT> toThrowingOperator(Supplier<? extends Throwable> onException);
 
     Valid<SUBJECT> validate(SUBJECT t);
 }

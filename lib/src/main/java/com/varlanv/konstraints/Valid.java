@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 public interface Valid<SUBJECT> {
 
@@ -29,17 +29,17 @@ public interface Valid<SUBJECT> {
         return valid(() -> value);
     }
 
-    static <SUBJECT> Valid<SUBJECT> valid(Supplier<@NotNull SUBJECT> delegate) {
+    static <SUBJECT> Valid<SUBJECT> valid(Supplier<@NonNull SUBJECT> delegate) {
         var supplier = Internals.onceSupplier(delegate);
         return new Valid<>() {
 
             @Override
-            public <R> Valid<R> map(Function<@NotNull SUBJECT, @NotNull R> mapper) {
+            public <R> Valid<R> map(Function<@NonNull SUBJECT, @NonNull R> mapper) {
                 return valid(Internals.onceSupplier(() -> mapper.apply(supplier.get())));
             }
 
             @Override
-            public <R> Valid<R> flatMap(Function<@NotNull SUBJECT, @NotNull Valid<R>> mapper) {
+            public <R> Valid<R> flatMap(Function<@NonNull SUBJECT, @NonNull Valid<R>> mapper) {
                 return mapper.apply(supplier.get());
             }
 
@@ -129,8 +129,7 @@ public interface Valid<SUBJECT> {
         };
     }
 
-    static <SUBJECT> ValidationSpec<SUBJECT> validationSpec(
-            Function<RootAssertionsSpec<SUBJECT, SUBJECT>, RootAssertionsSpec<SUBJECT, SUBJECT>> specAction) {
+    static <SUBJECT> ValidationSpec<SUBJECT> validationSpec(AssertionsOperator<SUBJECT> specAction) {
         return new RulesValidationSpec<>(specAction
                 .apply(
                         null
